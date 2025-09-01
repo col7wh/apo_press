@@ -1,6 +1,5 @@
 # core/safety_monitor.py
 import json
-from typing import Dict, Any
 import logging
 from core.global_state import state
 import time

@@ -29,6 +29,7 @@ hardware_interface: HardwareInterface = None
 press_controllers: Dict[int, PressController] = {}
 running = True
 daemon: HardwareDaemon = None  # будет инициализирован в main()
+control_managers = {}
 
 
 def load_system_config() -> Dict[str, Any]:
@@ -59,7 +60,6 @@ def start_press(press_id: int):
         logging.warning("M Пресс должен быть 1, 2 или 3.")
         return
 
-
     # Всегда создаём новый экземпляр
     pc = PressController(press_id=press_id, config=hw_config)
     press_controllers[press_id] = pc
@@ -84,22 +84,26 @@ def stop_press(press_id: int, emergency: bool = False):
 def show_status():
     print("\n" + "=" * 50)
     for pid in range(1, 4):
-        if pid in press_controllers:
-            pc = press_controllers[pid]
-            if pc.running:
-                status = "РАБОТАЕТ"
-                if pc.paused:
-                    status = "ПАУЗА"
-                step = pc.current_step_index + 1
-                total = len(pc.program)
-                print(f"Пресс-{pid}: {status} | Шаг {step}/{total}")
-            else:
-                if pc.completed:
-                    print(f"Пресс-{pid}: ЗАВЕРШЁН")
-                else:
-                    print(f"Пресс-{pid}: ОСТАНОВЛЕН")
+        # Читаем из state — единая точка истины
+        running = state.get(f"press_{pid}_running", False)
+        paused = state.get(f"press_{pid}_paused", False)
+        completed = state.get(f"press_{pid}_completed", False)
+
+        temp_step = state.get(f"press_{pid}_current_step_temperature", {})
+        press_step = state.get(f"press_{pid}_current_step_pressure", {})
+
+        index_temp = temp_step.get("index", -1)
+        index_press = press_step.get("index", -1)
+        current_step = max(index_temp, index_press) + 1 if max(index_temp, index_press) >= 0 else "-"
+
+        if running:
+            status = "ПАУЗА" if paused else "РАБОТАЕТ"
+            print(f"Пресс-{pid}: {status} | Шаг {current_step}")
         else:
-            print(f"Пресс-{pid}: НЕ ЗАПУЩЕН")
+            if completed:
+                print(f"Пресс-{pid}: ЗАВЕРШЁН")
+            else:
+                print(f"Пресс-{pid}: ОСТАНОВЛЕН")
     print("=" * 50)
 
 
@@ -111,7 +115,11 @@ def show_programs():
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     prog = json.load(f)
-                print(f"  Пресс {pid}: {len(prog)} шагов")
+                # 🔢 Считаем шаги
+                temp_steps = len(prog.get("temp_program", []))
+                press_steps = len(prog.get("pressure_program", []))
+                total = temp_steps + press_steps
+                print(f"  Пресс {pid}: {total} шагов (T:{temp_steps}, P:{press_steps})")
             except Exception as e:
                 print(f"  Пресс {pid}: ❌ ошибка загрузки ({e})")
         else:
@@ -202,19 +210,36 @@ def command_loop():
 
 
 def cleanup():
-    global running, daemon, hardware_interface
+    global running, daemon, hardware_interface, control_managers
     running = False
     logging.info("M Выполняется остановка системы...")
 
+    # Остановка PressController
     for pc in press_controllers.values():
         if pc.running:
             pc.stop()
             pc.join(timeout=1.0)
 
+    # Остановка ControlManager
+    for cm in control_managers.values():
+        cm.stop()
+        cm.join(timeout=1.0)
+
+    # Финальная синхронизация: выключить всё
+    if hardware_interface:
+        do_modules = ["31", "32", "34", "35", "36"]
+        for mod in do_modules:
+            logging.info(f"M Финальное выключение DO-{mod}")
+            hardware_interface._send_command(f"#{mod}0000")
+            time.sleep(0.05)
+            hardware_interface._send_command(f"#{mod}0B00")
+
+    # Остановка демона
     if daemon is not None:
         daemon.stop()
         daemon.join()
 
+    # Закрытие интерфейса
     if hardware_interface is not None:
         hardware_interface.close()
 
@@ -222,9 +247,9 @@ def cleanup():
 
 
 def print_structured_state():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("📊 СОСТОЯНИЕ СИСТЕМЫ")
-    print("="*60)
+    print("=" * 60)
 
     # --- ДИСКРЕТНЫЕ ВХОДЫ ---
     print("\n🔌 ДИСКРЕТНЫЕ ВХОДЫ")
@@ -234,7 +259,7 @@ def print_structured_state():
     # --- ТЕМПЕРАТУРА ---
     print("\n🌡️  ТЕМПЕРАТУРА")
     for pid in [1, 2, 3]:
-        temps = state.get(f"press_{pid}_temps", [None]*8)
+        temps = state.get(f"press_{pid}_temps", [None] * 8)
         target = state.get(f"press_{pid}_target_temp", "N/A")
         status_temp = state.get(f"press_{pid}_step_status_temperature", "stopped")
         print(f"  Пресс-{pid}: {temps[:7]} | Уставка: {target}°C | Статус: {status_temp}")
@@ -261,20 +286,20 @@ def print_structured_state():
         if temp_step or press_step:
             print(f"  Пресс-{pid}:")
             if temp_step:
-                print(f"    Темп:  {temp_step.get('index', '-')} | {temp_step.get('type', '-')} | Цель: {temp_step.get('target_temp', 'N/A')}°C")
+                print(
+                    f"    Темп:  {temp_step.get('index', '-')} | {temp_step.get('type', '-')} | Цель: {temp_step.get('target_temp', 'N/A')}°C")
             if press_step:
-                print(f"    Давл:  {press_step.get('index', '-')} | {press_step.get('type', '-')} | Цель: {press_step.get('target_pressure', 'N/A')} МПа")
+                print(
+                    f"    Давл:  {press_step.get('index', '-')} | {press_step.get('type', '-')} | Цель: {press_step.get('target_pressure', 'N/A')} МПа")
 
-    print("="*60)
+    print("=" * 60)
+
 
 atexit.register(cleanup)
 
-press_controllers = {}
-
 
 def main():
-    global hardware_interface, daemon, hw_config  # ✅ Добавь hw_config
-
+    global hardware_interface, daemon, hw_config, control_managers  # ✅ Добавь hw_config
 
     config = load_system_config()
     logging.info(f"M Система запущена в режиме: {config['mode']}")
@@ -291,7 +316,7 @@ def main():
     time.sleep(0.1)
     # show_programs()
     # После создания hw и daemon
-    control_managers = {}
+    # control_managers = {}
     for pid in [1, 2, 3]:
         cm = ControlManager(press_id=pid, config=hw_config)
         cm.start()
@@ -306,9 +331,6 @@ def main():
     web_ui = WebInterface(host="0.0.0.0", port=5000)
     web_ui.start()
     logging.info("M Веб-интерфейс запущен (http://localhost:5000)")
-
-
-
 
     try:
         while running:

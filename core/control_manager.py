@@ -140,8 +140,8 @@ class ControlManager(Thread):
             high = (desired >> 8) & 0xFF
             urgent = state.get("urgent_do", {})
             urgent[module_id] = (low, high)
-            state.set("urgent_do", urgent)
-
+            #state.set("urgent_do", urgent)
+            state.set_do_command(module_id, low, high, urgent=True)
             #print(f"CM Синхронизация DO-{module_id}: {current or 0:04X} → {desired:04X}")
 
     def _poll_buttons(self):
@@ -169,11 +169,10 @@ class ControlManager(Thread):
 
         modules = [self.lamp_do_module, self.heating_do_module, "31"]
         print(f"CM press {self.press_id} off modules {modules}")
+        urgent = state.get("urgent_do", {})
         for mid in modules:
-            state.write_do(mid, 0, 0)
-            urgent = state.get("urgent_do", {})
-            urgent[mid] = (0, 0)
-            state.set("urgent_do", urgent)
+            state.set_do_command(mid, 0, 0, urgent=True)
+
 
     def stop(self):
         self._ensure_all_off()
@@ -185,3 +184,4 @@ class ControlManager(Thread):
     def emergency_stop(self):
         self.stop()
         self.logger.warning(f"CM Пресс-{self.press_id} Аварийная остановка")
+

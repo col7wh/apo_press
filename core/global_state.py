@@ -77,6 +77,33 @@ class GlobalState:
             #print(f"STATE: write_do_bit → module={module_id}, current={current}, new_state={new_state}")  # 🔥 Добавь это
         self.write_do(module_id, low, high)
 
+    # core/global_state.py
+    def set_do_command(self, module_id: str, low: int, high: int, urgent: bool = False):
+        """Ставит команду в нужную очередь"""
+        with self._lock:
+            if urgent:
+                commands = self._data.get("urgent_do_commands", {})
+                commands = commands.copy() if commands else {}
+                commands[module_id] = (low, high)
+                self._data["urgent_do_commands"] = commands
+            else:
+                commands = self._data.get("heating_do_commands", {})
+                commands = commands.copy() if commands else {}
+                commands[module_id] = (low, high)
+                self._data["heating_do_commands"] = commands
+
+    def get_and_clear_urgent_do(self) -> dict:
+        with self._lock:
+            commands = self._data.get("urgent_do_commands", {})
+            self._data["urgent_do_commands"] = {}
+            return commands.copy()
+
+    def get_and_clear_heating_do(self) -> dict:
+        with self._lock:
+            commands = self._data.get("heating_do_commands", {})
+            self._data["heating_do_commands"] = {}
+            return commands.copy()
+
     def set(self, key: str, value: Any):
         with self._lock:
             self._data[key] = value

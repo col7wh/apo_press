@@ -3,7 +3,6 @@
 import json
 import time
 import logging
-import os
 from typing import Optional, List, Dict, Any, Union
 from core.global_state import state  # ✅ Добавлен импорт
 import threading
@@ -173,9 +172,9 @@ class HardwareInterface:
                         time.sleep(0.01)  # Не грузим CPU
 
                 response = raw.decode('utf-8', errors='ignore').strip()
-                #if (len(response) > 5 and len(response) != 57) or len(response) <= 4:
-                    #hardware_logger.info(f"HI DCON: {command} -> {response}")
-                    #return None
+                # if (len(response) > 5 and len(response) != 57) or len(response) <= 4:
+                    # hardware_logger.info(f"HI DCON: {command} -> {response}")
+                    # return None
                 if command.startswith("#") and len(command) >= 4:
                     self.stats["do_responses"] += 0.5
                     #print(f"HI DCON: {command} -> {response}")
@@ -339,7 +338,6 @@ class HardwareInterface:
     def log_quality_report(self):
         now = time.time()
         period = now - self.stats["last_reset"]
-        total = self.stats["total_commands"]
         good = self.stats["good_responses"]
         bad = self.stats["bad_responses"]
         mid = self.stats["mid_responses"]
@@ -347,6 +345,8 @@ class HardwareInterface:
         di = self.stats["di_responses"]
         do = self.stats["do_responses"]
         by_mod = self.stats["commands_by_module"]
+        speed = 0
+        quality = 0
         total = good + bad
 
         #print(period, total, good, bad)
@@ -373,7 +373,6 @@ class HardwareInterface:
             "mid": mid,
             "period": round(period, 1)
         })
-
 
         # Сброс для следующего периода
         self.stats = {

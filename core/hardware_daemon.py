@@ -19,7 +19,6 @@ class HardwareDaemon(Thread):
         self.command_queue = []
         self.last_di_time = 0
         self.last_ai_time = 0
-        self.last_pressure_time = 0
         self.last_do_time = 0
         self.last_pressure_time = 0
 
@@ -29,28 +28,40 @@ class HardwareDaemon(Thread):
     def run(self):
         logging.info("HD HardwareDaemon запущен")
         last_report = time.time()
+        last_urgent_check = 0
+        last_heating_check = 0
+
         while self.running:
             try:
-                self._process_cycle()
-                # Каждые 10 сек — отчёт
-                if time.time() - last_report >= 60.0:
+                now = time.time()
+
+                # 1. Планируем команды чтения
+                self._schedule_commands(now)
+
+                # 2. Выполняем команды из очереди
+                if self.command_queue:
+                    cmd = self.command_queue.pop(0)
+                    self._execute_command(cmd)
+
+                # 3. Отправляем DO — без команды в очереди
+                if now - last_urgent_check >= 0.1:
+                    self._write_urgent_do()
+                    last_urgent_check = now
+
+                if now - last_heating_check >= 1.0:
+                    self._write_heating_do()
+                    last_heating_check = now
+
+                # 4. Отчёт
+                if now - last_report >= 60.0:
                     self.hw.log_quality_report()
-                    # logging.info("Report!")
-                    last_report = time.time()
+                    last_report = now
+
                 time.sleep(0.01)
+
             except Exception as e:
                 logging.error(f"HD Ошибка в цикле: {e}", exc_info=True)
                 time.sleep(1)
-
-    def _process_cycle(self):
-        now = time.time()
-        self._schedule_commands(now)
-
-        if not self.command_queue:
-            return
-
-        cmd = self.command_queue.pop(0)
-        self._execute_command(cmd)
 
     def _schedule_commands(self, now):
         if now - self.last_di_time >= 0.1:
@@ -92,10 +103,6 @@ class HardwareDaemon(Thread):
                 })
             self.last_pressure_time = now
 
-        if now - self.last_do_time >= 0.5:  # Каждые 500 мс — синхронизация DO
-            self.command_queue.append({"type": "write_do"})
-            self.last_do_time = now
-
     def _execute_command(self, cmd):
         try:
             if cmd["type"] == "read_di":
@@ -131,11 +138,6 @@ class HardwareDaemon(Thread):
                     state.set(f"do_state_{cmd['module']}", value)
                     #print(f"HD try read_digital {cmd['module']}, cyr val in state {value}")
 
-
-            elif cmd["type"] == "write_do":
-                self._write_outputs()
-
-
         except Exception as e:
             logging.error(f"HD Ошибка выполнения команды {cmd}: {e}")
 
@@ -144,20 +146,96 @@ class HardwareDaemon(Thread):
         if not urgent:
             return
 
-        # 🔁 Выполняем все команды
+        # 🔒 Копируем ключи, чтобы итерироваться безопасно
+        keys_to_process = list(urgent.keys())
+        success = True
+        if keys_to_process != {}:
+            print(f"HD urgent is {keys_to_process} ")
+
         with self.hw.lock:
-            for mid, (low, high) in urgent.items():
+            for mid in keys_to_process:
+                if mid not in urgent:
+                    continue  # мог быть удалён другим потоком
+                low, high = urgent[mid]
                 try:
-                    if self.hw._send_command(f"#{mid}00{low:02X}") and self.hw._send_command(f"#{mid}0B{high:02X}"):
-                        # Только при успехе — удаляем
+                    cmd_low = f"#{mid}00{low:02X}"
+                    cmd_high = f"#{mid}0B{high:02X}"
+
+                    if self.hw._send_command(cmd_low) and self.hw._send_command(cmd_high):
+                        # ✅ Успешно отправлено
+                        full_value = (high << 8) | low
+                        state.set(f"do_state_{mid}", full_value)
                         del urgent[mid]
-                    #time.sleep(0.1)
-                    #print(f"HD write #{mid}00{low:02X} + #{mid}0B{high:02X} ")
+                    else:
+                        success = False
                 except Exception as e:
                     logging.error(f"HD: ошибка при отправке #{mid}00{low:02X} и #{mid}0B{high:02X}: {e}")
+                    success = False
 
-            # После цикла — сохраняем оставшиеся
+        # ✅ Сохраняем оставшиеся команды
+        if success:
+            state.set("urgent_do", {})
+        else:
             state.set("urgent_do", urgent)
+            print(f"urgent not empty, continue")
+
+    def _write_urgent_do(self):
+        urgent = state.get("urgent_do_commands", {})
+        if not urgent:
+            return
+
+        keys = list(urgent.keys())
+        success = True
+
+        with self.hw.lock:
+            for mid in keys:
+                if mid not in urgent:
+                    continue
+                low, high = urgent[mid]
+                try:
+                    if self.hw._send_command(f"#{mid}00{low:02X}") and self.hw._send_command(f"#{mid}0B{high:02X}"):
+                        full = (high << 8) | low
+                        state.set(f"do_state_{mid}", full)
+                        del urgent[mid]
+                    else:
+                        success = False
+                except Exception as e:
+                    logging.error(f"HD: ошибка отправки #{mid}: {e}")
+                    success = False
+
+        if success:
+            state.set("urgent_do_commands", {})
+        else:
+            state.set("urgent_do_commands", urgent)
+
+    def _write_heating_do(self):
+        heating = state.get("heating_do_commands", {})
+        if not heating:
+            return
+
+        keys = list(heating.keys())
+        success = True
+
+        with self.hw.lock:
+            for mid in keys:
+                if mid not in heating:
+                    continue
+                low, high = heating[mid]
+                try:
+                    if self.hw._send_command(f"#{mid}00{low:02X}") and self.hw._send_command(f"#{mid}0B{high:02X}"):
+                        full = (high << 8) | low
+                        state.set(f"do_state_{mid}", full)
+                        del heating[mid]
+                    else:
+                        success = False
+                except Exception as e:
+                    logging.error(f"HD: ошибка отправки #{mid}: {e}")
+                    success = False
+
+        if success:
+            state.set("heating_do_commands", {})
+        else:
+            state.set("heating_do_commands", heating)
 
     def _get_all_do_modules(self):
         """Возвращает список всех DO-модулей, которые нужно читать"""

@@ -146,7 +146,8 @@ class TemperatureController(threading.Thread):
         self.running = False
         state.set(f"press_{self.press_id}_target_temp", None)
         for ch in self.heater_channels:
-            state.write_do_bit(self.do_module, ch, False)
+            #state.write_do_bit(self.do_module, ch, False)
+            state.set_do_command(self.do_module, 0, 0, urgent=False)
 
     def run(self):
         logging.info(f"TC Пресс-{self.press_id}: поток нагрева запущен")
@@ -157,36 +158,48 @@ class TemperatureController(threading.Thread):
     def update(self):
         target_temp = state.get(f"press_{self.press_id}_target_temp")
         if target_temp is None:
-            # ❌ Не просто выйти, а выключить всё!
+            # 🔥 Выключаем ТОЛЬКО свои каналы
+            current_state = state.read_digital(self.do_module) or 0
+            new_state = current_state
+
             for ch in self.heater_channels:
-                state.write_do_bit(self.do_module, ch, False)
+                mask = 1 << ch
+                new_state &= ~mask  # Сбрасываем бит
+
+            if current_state != new_state:
+                low = new_state & 0xFF
+                high = (new_state >> 8) & 0xFF
+                state.set_do_command(self.do_module, low, high, urgent=False)
+                logging.info(f"TC Пресс-{self.press_id}: нагрев выключен (target_temp = None)")
             return
 
         temps = self.read_all_temperatures()
+        # 🔥 Читаем ТЕКУЩЕЕ состояние DO-модуля
+        current_state = state.read_digital(self.do_module) or 0
+        new_state = current_state  # Начинаем с текущего
 
-        # 🔥 Собираем новое состояние целиком
-        new_state = 0
-        for zone in range(self.zones):
-            ch = self.heater_channels[zone]
+        # Определяем свои биты
+        my_channels = self.heater_channels  # [0,1,2,3] для Пресса 1, [4,5,6,7] для Пресса 2
+
+        for zone, ch in enumerate(my_channels):
             t = temps[zone]
             if t is None:
                 continue
             should_heat = t < target_temp - self.hysteresis
-            if should_heat:
-                new_state |= (1 << ch)
 
-        # Читаем ТЕКУЩЕЕ состояние модуля
-        # костыль
-        #current_state = state.read_digital(self.do_module) or 0
-        current_state = state.read_digital(self.do_module)
+            mask = 1 << ch
+            if should_heat:
+                new_state |= mask
+            else:
+                new_state &= ~mask
 
         # 🔥 Только если изменилось — отправляем
         if current_state != new_state:
             low = new_state & 0xFF
             high = (new_state >> 8) & 0xFF
-            state.write_do(self.do_module, low, high)
-            #print(f"TC Пресс-{self.press_id}: DO-{self.do_module} → 0x{new_state:04X} "
-                         #f"(было: 0x{current_state:04X}) ишем в gs state.read_digital")
+            state.set_do_command(self.do_module, low, high, urgent=False)
+            # print(f"TC Пресс-{self.press_id}: DO-{self.do_module} → 0x{new_state:04X} "
+            # f"(было: 0x{current_state:04X}) ишем в gs state.read_digital")
 
     def stop(self):
         logging.info(f"TC Пресс-{self.press_id}: остановлен")

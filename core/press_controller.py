@@ -45,10 +45,14 @@ class PressController(threading.Thread):
             logging.error(f"РС Пресс-{self.press_id}: обе программы пусты")
             return
 
+        state.set(f"press_{self.press_id}_running", True)
+        state.set(f"press_{self.press_id}_paused", False)
+        state.set(f"press_{self.press_id}_completed", False)
         self.running = True
         self.completed = False
+        logging.info("=====================================================================================")
         logging.info(f"РС Пресс-{self.press_id}: запуск программы (temp: {len(temp_prog)}, pressure: {len(press_prog)})")
-        logging.info(f"РС Пресс-{self.press_id}: выполнение ({program})")
+        # logging.info(f"РС Пресс-{self.press_id}: выполнение ({program})")
 
         # Создаём и запускаем StepExecutor
         self.executor = StepExecutor(self.press_id)
@@ -69,6 +73,9 @@ class PressController(threading.Thread):
             self.executor.stop()
             self.executor.join(timeout=1.0)
 
+        state.set(f"press_{self.press_id}_running", False)
+        state.set(f"press_{self.press_id}_paused", False)
+        state.set(f"press_{self.press_id}_completed", True)
         self.running = False
         self.completed = True
         logging.info(f"РС Пресс-{self.press_id}: программа завершена.")
@@ -79,7 +86,9 @@ class PressController(threading.Thread):
 
         logging.info(f"РС Пресс-{self.press_id}: остановка по запросу")
         self.running = False
-
+        state.set(f"press_{self.press_id}_running", False)
+        state.set(f"press_{self.press_id}_paused", False)
+        state.set(f"press_{self.press_id}_completed", True)
         # 1. Остановить StepExecutor
         if self.executor and self.executor.is_alive():
             self.executor.stop()
@@ -91,7 +100,11 @@ class PressController(threading.Thread):
 
         # 3. Выключить всё на DO
         do_module = self.config["presses"][self.press_id - 1]["modules"]["do"]
-        state.write_do(do_module, 0, 0)
+        urgent = state.get("urgent_do", {})
+        urgent[do_module] = (0, 0)
+        state.set("urgent_do", urgent)
+
+        # state.write_do(do_module, 0, 0)
 
         # 4. Обновить статус
         state.set(f"press_{self.press_id}_step_status_temperature", "stopped")
@@ -109,6 +122,7 @@ class PressController(threading.Thread):
 
     def pause(self):
         """Пауза"""
+        state.set(f"press_{self.press_id}_paused", True)
         self.paused = True
         state.set(f"press_{self.press_id}_step_status", "paused")
         logging.info(f"РС Пресс-{self.press_id}: поставлен на паузу.")
