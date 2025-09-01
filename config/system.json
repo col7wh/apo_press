@@ -1,0 +1,9 @@
+{
+  "mode": "real",
+  "com_port": "COM3",
+  "baudrate": 9600,
+  "timeout": 1.0,
+  "poll_interval": 0.5,
+  "log_dcon_traffic": true,
+  "enable_safety_check": true
+}

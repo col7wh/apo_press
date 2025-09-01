@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-04-05T14:30:00",
+  "presses": {
+    "0": {
+      "noSelectProgram": 5,
+      "tSec1": 450,
+      "stepP": 2,
+      "stepT": 1,
+      "pTargetCurr": 10.0,
+      "tTargetCurr": 30.0,
+      "endFlagP": 0,
+      "endFlagT": 0,
+      "pressState": 51,
+      "initTime": 150
+    }
+  }
+}

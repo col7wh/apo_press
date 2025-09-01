@@ -1,0 +1,25 @@
+[
+  {
+    "step": "heat",
+    "target_temp": 50,
+    "max_duration": 600
+  },
+  {
+    "step": "hold",
+    "duration": 300
+  },
+  {
+    "step": "set_pressure",
+    "pressure": 5.0,
+    "duration": 180
+  },
+  {
+    "step": "set_pressure",
+    "pressure": 10.0,
+    "duration": 60
+  },
+  {
+    "step": "cool",
+    "duration": 300
+  }
+]

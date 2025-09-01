@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>🔧 Редактор программ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* ... (тот же CSS, что и раньше) ... */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+            font-size: 13px;
+            padding: 10px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #1976d2;
+            margin-bottom: 20px;
+        }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 8px 16px;
+            background: #333;
+            border: none;
+            color: #ddd;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background: #1976d2;
+            color: white;
+        }
+        .form-section {
+            display: none;
+            background: #1e1e1e;
+            padding: 16px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .form-section.active {
+            display: block;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #bbb;
+        }
+        input, select, button {
+            padding: 6px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #333;
+            color: #fff;
+            font-size: 13px;
+        }
+        input[readonly] {
+            background: #2a2a2a;
+            color: #888;
+        }
+        button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0d47a1;
+        }
+        .step {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px;
+            background: #2a2a2a;
+            border-radius: 6px;
+        }
+        .step button {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        .time-summary {
+            font-size: 14px;
+            color: #64b5f6;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .actions {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            background: #43a047;
+        }
+        .btn-secondary {
+            background: #fb8c00;
+        }
+        .btn-danger {
+            background: #e53935;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Редактор программ</h1>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="press1">Пресс 1</button>
+            <button class="tab" data-tab="press2">Пресс 2</button>
+            <button class="tab" data-tab="press3">Пресс 3</button>
+        </div>
+
+        <div id="press1" class="form-section active">
+            <h3>Температура</h3>
+            <div id="tempSteps1"></div>
+            <button type="button" onclick="addTempStep(1)">+ Добавить шаг</button>
+            <div class="time-summary" id="tempTime1">Суммарное время: 0 с</div>
+
+            <h3>Давление</h3>
+            <div id="pressSteps1"></div>
+            <button type="button" onclick="addPressStep(1)">+ Добавить шаг</button>
+            <div class="time-summary" id="pressTime1">Суммарное время: 0 с</div>
+
+            <div class="actions">
+                <button class="btn" onclick="saveCurrent(1)">💾 Сохранить</button>
+                <button class="btn btn-secondary" onclick="saveAsCurrent(1)">💾 Сохранить как…</button>
+                <button class="btn btn-danger" onclick="loadIntoPress(1)">📂 Открыть</button>
+            </div>
+        </div>
+
+        <div id="press2" class="form-section">
+            <!-- Повтор для пресса 2 -->
+            <h3>Температура</h3>
+            <div id="tempSteps2"></div>
+            <button type="button" onclick="addTempStep(2)">+ Добавить шаг</button>
+            <div class="time-summary" id="tempTime2">Суммарное время: 0 с</div>
+
+            <h3>Давление</h3>
+            <div id="pressSteps2"></div>
+            <button type="button" onclick="addPressStep(2)">+ Добавить шаг</button>
+            <div class="time-summary" id="pressTime2">Суммарное время: 0 с</div>
+
+            <div class="actions">
+                <button class="btn" onclick="saveCurrent(2)">💾 Сохранить</button>
+                <button class="btn btn-secondary" onclick="saveAsCurrent(2)">💾 Сохранить как…</button>
+                <button class="btn btn-danger" onclick="loadIntoPress(2)">📂 Открыть</button>
+            </div>
+        </div>
+
+        <div id="press3" class="form-section">
+            <!-- Повтор для пресса 3 -->
+            <h3>Температура</h3>
+            <div id="tempSteps3"></div>
+            <button type="button" onclick="addTempStep(3)">+ Добавить шаг</button>
+            <div class="time-summary" id="tempTime3">Суммарное время: 0 с</div>
+
+            <h3>Давление</h3>
+            <div id="pressSteps3"></div>
+            <button type="button" onclick="addPressStep(3)">+ Добавить шаг</button>
+            <div class="time-summary" id="pressTime3">Суммарное время: 0 с</div>
+
+            <div class="actions">
+                <button class="btn" onclick="saveCurrent(3)">💾 Сохранить</button>
+                <button class="btn btn-secondary" onclick="saveAsCurrent(3)">💾 Сохранить как…</button>
+                <button class="btn btn-danger" onclick="loadIntoPress(3)">📂 Открыть</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const stepLabels = {
+            'ramp_temp': 'Нагрев до температуры',
+            'hold': 'Выдержка',
+            'cool': 'Охлаждение',
+            'ramp_pressure': 'Подача давления',
+            'lift_to_limit': 'Подъём до упора',
+            'open_mold': 'Открыть форму',
+            'pause': 'Пауза',
+            'set_pressure': 'Установить давление'
+        };
+
+        const reverseLabels = Object.fromEntries(Object.entries(stepLabels).map(([k, v]) => [v, k]));
+
+        const programs = {
+            press1: { temp_program: [], pressure_program: [] },
+            press2: { temp_program: [], pressure_program: [] },
+            press3: { temp_program: [], pressure_program: [] }
+        };
+
+        // Загрузка всех программ
+        fetch('/get_programs')
+            .then(r => r.json())
+            .then(data => {
+                Object.keys(data).forEach(k => {
+                    programs[k] = data[k];
+                });
+                renderAll();
+            });
+
+        function renderAll() {
+            for (let pid = 1; pid <= 3; pid++) {
+                renderTempSteps(pid);
+                renderPressSteps(pid);
+                updateTimes(pid);
+            }
+        }
+
+        function renderTempSteps(pid) {
+            const container = document.getElementById(`tempSteps${pid}`);
+            container.innerHTML = '';
+            programs[`press${pid}`].temp_program.forEach((step, i) => {
+                const div = document.createElement('div');
+                div.className = 'step';
+                div.innerHTML = `
+                    <select onchange="updateStep(this, 'temp', ${pid}, ${i})">
+                        ${Object.values(stepLabels).map(label => `
+                            <option value="${label}" ${stepLabels[step.step] === label ? 'selected' : ''}>${label}</option>
+                        `).join('')}
+                    </select>
+                    <input type="number" placeholder="Цель (°C)" value="${step.target_temp || ''}" step="0.1" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+                    <input type="number" placeholder="Время подъёма (с)" value="${step.ramp_time || ''}" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+                    <input type="number" placeholder="Выдержка (с)" value="${step.hold_time || ''}" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+                    <button onclick="removeTempStep(${pid}, ${i})">–</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderPressSteps(pid) {
+            const container = document.getElementById(`pressSteps${pid}`);
+            container.innerHTML = '';
+            programs[`press${pid}`].pressure_program.forEach((step, i) => {
+                const div = document.createElement('div');
+                div.className = 'step';
+                const target = step.target_pressure !== undefined ? step.target_pressure : '';
+                const ramp = step.ramp_time !== undefined ? step.ramp_time : '';
+                const hold = step.hold_time !== undefined ? step.hold_time : '';
+
+                div.innerHTML = `
+                    <select onchange="updatePressStepType(this, ${pid}, ${i})">
+                        ${Object.values(stepLabels).map(label => `
+                            <option value="${label}" ${stepLabels[step.step] === label ? 'selected' : ''}>${label}</option>
+                        `).join('')}
+                    </select>
+                    <input type="number" placeholder="Цель (МПа)" value="${target}" step="0.1" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
+                    <input type="number" placeholder="Время (с)" value="${ramp}" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
+                    <input type="number" placeholder="Выдержка (с)" value="${hold}" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
+                    <button onclick="removePressStep(${pid}, ${i})">–</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function updatePressStepType(select, pid, i) {
+            const label = select.value;
+            const stepKey = reverseLabels[label];
+            const step = programs[`press${pid}`].pressure_program[i];
+            step.step = stepKey;
+
+            if (['lift_to_limit', 'open_mold'].includes(stepKey)) {
+                step.target_pressure = undefined;
+                step.ramp_time = undefined;
+                step.hold_time = undefined;
+            }
+            renderPressSteps(pid);
+        }
+
+        function updateStep(input, type, pid, i) {
+            const step = type === 'temp'
+                ? programs[`press${pid}`].temp_program[i]
+                : programs[`press${pid}`].pressure_program[i];
+
+            const val = input.value !== '' ? parseFloat(input.value) : undefined;
+            if (input.placeholder.includes('Цель')) {
+                if (type === 'temp') step.target_temp = val;
+                else step.target_pressure = val;
+            } else if (input.placeholder.includes('подъёма') || input.placeholder.includes('Время')) {
+                step.ramp_time = val;
+            } else if (input.placeholder.includes('Выдержка')) {
+                step.hold_time = val;
+            }
+            updateTimes(pid);
+        }
+
+        function addTempStep(pid) {
+            programs[`press${pid}`].temp_program.push({
+                step: 'ramp_temp',
+                target_temp: 50,
+                ramp_time: 300,
+                hold_time: 300
+            });
+            renderTempSteps(pid);
+            updateTimes(pid);
+        }
+
+        function addPressStep(pid) {
+            programs[`press${pid}`].pressure_program.push({
+                step: 'ramp_pressure',
+                target_pressure: 5.0,
+                ramp_time: 60,
+                hold_time: 180
+            });
+            renderPressSteps(pid);
+            updateTimes(pid);
+        }
+
+        function removeTempStep(pid, i) {
+            programs[`press${pid}`].temp_program.splice(i, 1);
+            renderTempSteps(pid);
+            updateTimes(pid);
+        }
+
+        function removePressStep(pid, i) {
+            programs[`press${pid}`].pressure_program.splice(i, 1);
+            renderPressSteps(pid);
+            updateTimes(pid);
+        }
+
+        function updateTimes(pid) {
+            const tempSum = programs[`press${pid}`].temp_program.reduce((sum, s) => sum + (s.ramp_time || 0) + (s.hold_time || 0), 0);
+            const pressSum = programs[`press${pid}`].pressure_program.filter(s => s.ramp_time).reduce((sum, s) => sum + (s.ramp_time || 0) + (s.hold_time || 0), 0);
+            document.getElementById(`tempTime${pid}`).textContent = `Суммарное время: ${formatTime(tempSum)}`;
+            document.getElementById(`pressTime${pid}`).textContent = `Суммарное время: ${formatTime(pressSum)}`;
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins} мин ${secs} с`;
+        }
+
+        // ✅ Сохранить текущий пресс
+        function saveCurrent(pressId) {
+            const program = programs[`press${pressId}`];
+            fetch('/save_press', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ press_id: pressId, program: program })
+            }).then(() => alert(`✅ Пресс-${pressId} сохранён в press${pressId}.json`));
+        }
+
+        // ✅ Сохранить как… (браузерный диалог)
+        function saveAsCurrent(pressId) {
+            const program = programs[`press${pressId}`];
+            const data = JSON.stringify(program, null, 4);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `press${pressId}_backup.json`;
+            a.click();
+        }
+
+        // ✅ Открыть и загрузить в текущий пресс
+        async function loadIntoPress(pressId) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = async () => {
+                const file = input.files[0];
+                const text = await file.text();
+                const loaded = JSON.parse(text);
+                programs[`press${pressId}`] = loaded;
+                renderTempSteps(pressId);
+                renderPressSteps(pressId);
+                updateTimes(pressId);
+            };
+            input.click();
+        }
+
+        // Переключение вкладок
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

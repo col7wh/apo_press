@@ -1,0 +1,124 @@
+{
+  "com_port": "COM3",
+  "baudrate": 9600,
+  "num_of_presses": 6,
+  "num_of_couples": 8,
+  "kp": 35.0,
+  "ki": 0.3,
+  "kd": 0.0,
+  "max_error_t": 10.0,
+  "max_error_p": 1.0,
+  "delta_write": 600,
+  "delta_write_error": 60,
+  "target_temperatures": [
+    60.0,
+    60.0,
+    60.0,
+    60.0,
+    60.0,
+    60.0
+  ],
+  "initial_pressures": [
+    1.0,
+    1.2,
+    1.5,
+    1.8,
+    2.0,
+    2.2
+  ],
+  "calibration": {
+    "rcT": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "roT": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rcP": 1.0,
+    "roP": 0.0
+  },
+  "log_level": "INFO",
+  "data_dir": "data",
+  "programs_dir": "programs",
+  "auto_start_main": true,
+  "main_script": "main.py",
+  "scan_range": [
+    1,
+    38
+  ],
+  "dcon_devices": [
+    {
+      "id": 8,
+      "model": "I-7017",
+      "type": "7017"
+    },
+    {
+      "id": 11,
+      "model": "I-7017",
+      "type": "7017"
+    },
+    {
+      "id": 17,
+      "model": "I-7018",
+      "type": "7018"
+    },
+    {
+      "id": 18,
+      "model": "I-7018",
+      "type": "7018"
+    },
+    {
+      "id": 19,
+      "model": "I-7018",
+      "type": "7018"
+    },
+    {
+      "id": 31,
+      "model": "I-7045",
+      "type": "7045"
+    },
+    {
+      "id": 32,
+      "model": "I-7045",
+      "type": "7045"
+    },
+    {
+      "id": 33,
+      "model": "I-7045",
+      "type": "7045"
+    },
+    {
+      "id": 34,
+      "model": "I-7045",
+      "type": "7045"
+    },
+    {
+      "id": 37,
+      "model": "I-7051",
+      "type": "7051"
+    },
+    {
+      "id": 38,
+      "model": "I-7051",
+      "type": "7051"
+    },
+    {
+      "id": 39,
+      "model": "I-7051",
+      "type": "7051"
+    }
+  ]
+}

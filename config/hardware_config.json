@@ -1,0 +1,265 @@
+{
+  "presses": [
+    {
+      "id": 1,
+      "modules": {
+        "ai": "17",
+        "do": "34"
+      },
+      "heater_channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "valves": {
+        "lift_up": { "module": "31", "bit": 7 },
+        "lift_down": { "module": "31", "bit": 8 },
+        "open": { "module": "31", "bit": 9 },
+        "close": { "module": "31", "bit": 10 }
+      },
+      "safety_inputs": {
+        "e_stop": {
+          "module": "38",
+          "bit": 4,
+          "type": "active_high"
+        },
+        "door_closed": {
+          "module": "38",
+          "bit": 5,
+          "type": "active_high"
+        },
+        "press_closed": {
+          "module": "38",
+          "bit": 6,
+          "type": "active_high"
+        }
+      },
+      "control_inputs": {
+        "start_btn": {
+          "module": "37",
+          "bit": 9,
+          "type": "active_high"
+        },
+        "stop_btn": {
+          "module": "37",
+          "bit": 10,
+          "type": "active_high"
+        },
+        "pause_btn": {
+          "module": "37",
+          "bit": 8,
+          "type": "active_low"
+        },
+        "preheat_btn": {
+          "module": "37",
+          "bit": 11,
+          "type": "active_high"
+        },
+        "limit_switch": {
+          "module": "37",
+          "bit": 14,
+          "type": "active_high"
+        }
+      },
+      "status_outputs": {
+        "lamp_pause": {
+          "module": "32",
+          "bit": 2,
+          "type": "active_high"
+        },
+        "lamp_run": {
+          "module": "32",
+          "bit": 3,
+          "type": "active_high"
+        },
+        "lamp_preheat": {
+          "module": "32",
+          "bit": 4,
+          "type": "active_high"
+        },
+        "lamp_auto_heat": {
+          "module": "32",
+          "bit": 5,
+          "type": "active_high"
+        },
+        "lamp_pressure": {
+          "module": "32",
+          "bit": 6,
+          "type": "active_high"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "modules": {
+        "ai": "18",
+        "do": "33"
+      },
+      "heater_channels": [8, 9, 10, 11, 12, 13, 14, 15] ,
+      "valves": {
+        "lift_up": { "module": "31", "bit": 14 },
+        "lift_down": { "module": "31", "bit": 15 },
+        "open": { "module": "32", "bit": 11 },
+        "close": { "module": "32", "bit": 12 }
+      },
+      "safety_inputs": {
+        "e_stop": {
+          "module": "38",
+          "bit": 7,
+          "type": "active_high"
+        },
+        "door_closed": {
+          "module": "38",
+          "bit": 8,
+          "type": "active_high"
+        },
+        "press_closed": {
+          "module": "38",
+          "bit": 9,
+          "type": "active_high"
+        }
+      },
+      "control_inputs": {
+        "start_btn": {
+          "module": "37",
+          "bit": 5,
+          "type": "active_high"
+        },
+        "stop_btn": {
+          "module": "37",
+          "bit": 6,
+          "type": "active_high"
+        },
+        "pause_btn": {
+          "module": "37",
+          "bit": 4,
+          "type": "active_low"
+        },
+        "preheat_btn": {
+          "module": "37",
+          "bit": 7,
+          "type": "active_high"
+        },
+        "limit_switch": {
+          "module": "37",
+          "bit": 13,
+          "type": "active_high"
+        }
+      },
+      "status_outputs": {
+        "lamp_pause": {
+          "module": "31",
+          "bit": 0,
+          "type": "active_high"
+        },
+        "lamp_run": {
+          "module": "31",
+          "bit": 1,
+          "type": "active_high"
+        },
+        "lamp_preheat": {
+          "module": "31",
+          "bit": 2,
+          "type": "active_high"
+        },
+        "lamp_auto_heat": {
+          "module": "31",
+          "bit": 3,
+          "type": "active_high"
+        },
+        "lamp_pressure": {
+          "module": "31",
+          "bit": 4,
+          "type": "active_high"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "modules": {
+        "ai": "19",
+        "do": "33"
+      },
+      "heater_channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "valves": {
+        "lift_up": { "module": "31", "bit": 5 },
+        "lift_down": { "module": "31", "bit": 6 },
+        "open": { "module": "31", "bit": 7 },
+        "close": { "module": "31", "bit": 8 }
+      },
+      "safety_inputs": {
+        "e_stop": {
+          "module": "38",
+          "bit": 10,
+          "type": "active_high"
+        },
+        "door_closed": {
+          "module": "38",
+          "bit": 11,
+          "type": "active_high"
+        },
+        "press_closed": {
+          "module": "38",
+          "bit": 12,
+          "type": "active_high"
+        }
+      },
+      "control_inputs": {
+        "start_btn": {
+          "module": "37",
+          "bit": 1,
+          "type": "active_high"
+        },
+        "stop_btn": {
+          "module": "37",
+          "bit": 2,
+          "type": "active_high"
+        },
+        "pause_btn": {
+          "module": "37",
+          "bit": 0,
+          "type": "active_low"
+        },
+        "preheat_btn": {
+          "module": "37",
+          "bit": 3,
+          "type": "active_high"
+        },
+        "limit_switch": {
+          "module": "37",
+          "bit": 12,
+          "type": "active_high"
+        }
+      },
+      "status_outputs": {
+        "lamp_pause": {
+          "module": "31",
+          "bit": 9,
+          "type": "active_high"
+        },
+        "lamp_run": {
+          "module": "31",
+          "bit": 10,
+          "type": "active_high"
+        },
+        "lamp_preheat": {
+          "module": "31",
+          "bit": 11,
+          "type": "active_high"
+        },
+        "lamp_auto_heat": {
+          "module": "31",
+          "bit": 12,
+          "type": "active_high"
+        },
+        "lamp_pressure": {
+          "module": "31",
+          "bit": 13,
+          "type": "active_high"
+        }
+      }
+    }
+  ],
+  "common": {
+	"di_module": "37",
+    "di_module_2": "38",
+    "do_module_1": "31",
+    "do_module_2": "32",
+    "ai_pressure_module": "11"  }
+}

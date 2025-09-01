@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование программы</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Редактирование программы</h1>
+    </header>
+
+    <main>
+        <!-- Убираем форму выбора программы -->
+        <h3>Все программы</h3>
+
+        {% if programs %}
+            {% for selected_program in programs %}
+                <form method="POST">
+                    <h3>Программа {{ selected_program['index'] }}</h3>
+
+                    <h4>Пресс 1 - Шаги температуры</h4>
+                    <table>
+                        <tr>
+                            <th>Шаг температуры</th>
+                            <th>Целевая температура</th>
+                            <th>Время разогрева</th>
+                            <th>Время удержания</th>
+                        </tr>
+                        {% for step in selected_program['temp_program'] %}
+                            <tr>
+                                <td>{{ step['step'] }}</td>
+                                <td><input type="text" name="press1_temp_program_{{ loop.index }}" value="{{ step['target_temp'] }}"></td>
+                                <td><input type="text" name="press1_temp_program_{{ loop.index }}_ramp_time" value="{{ step['ramp_time'] }}"></td>
+                                <td><input type="text" name="press1_temp_program_{{ loop.index }}_hold_time" value="{{ step['hold_time'] }}"></td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+
+                    <h4>Пресс 1 - Шаги давления</h4>
+                    <table>
+                        <tr>
+                            <th>Шаг давления</th>
+                            <th>Целевое давление</th>
+                            <th>Время разогрева</th>
+                            <th>Время удержания</th>
+                        </tr>
+                        {% for step in selected_program['pressure_program'] %}
+                            <tr>
+                                <td>{{ step['step'] }}</td>
+                                <td><input type="text" name="press1_pressure_program_{{ loop.index }}" value="{{ step['target_pressure'] }}"></td>
+                                <td><input type="text" name="press1_pressure_program_{{ loop.index }}_ramp_time" value="{{ step['ramp_time'] }}"></td>
+                                <td><input type="text" name="press1_pressure_program_{{ loop.index }}_hold_time" value="{{ step['hold_time'] }}"></td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+
+                    <div>
+                        <button type="submit">Сохранить</button>
+                        <button type="button" onclick="saveAsNew()">Сохранить как новое</button>
+                        <button type="button" onclick="openFile()">Открыть файл</button>
+                    </div>
+                </form>
+            {% endfor %}
+        {% endif %}
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Все права защищены</p>
+    </footer>
+
+    <script>
+    function saveAsNew() {
+        alert("Функция сохранения как нового файла не реализована.");
+    }
+
+    function openFile() {
+        alert("Функция открытия файла не реализована.");
+    }
+    </script>
+</body>
+</html>
