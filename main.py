@@ -12,7 +12,7 @@ from core.press_controller import PressController
 from core.hardware_daemon import HardwareDaemon
 from core.web_interface import WebInterface
 from core.control_manager import ControlManager
-from core.global_state import state  # ✅ Используем шину
+from core.global_state import state
 
 # Настройка логирования
 logging.basicConfig(

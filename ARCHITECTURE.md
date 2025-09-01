@@ -9,7 +9,7 @@
 │
 ├── main.py                 # Основной контроллер (CLI)
 ├── diagnose.py             # Диагностика оборудования
-├── simulator.py            # Симулятор DCON-устройств
+├── simulator2.py            # Симулятор DCON-устройств
 ├── programs/               # Программы для прессов (JSON)
 │   ├── press1.json
 │   ├── press2.json
@@ -31,6 +31,9 @@
 ├── data/                   # Архивы процессов (CSV)
 │   ├── data0.csv
 │   └── ...
+├── templates/ 
+│   ├── dashboard.html
+│   └── edit_program.html
 ├── app.log                 # Логи системы
 ├── build.bat               # Сборка в .exe (pyinstaller)
 └── requirements.txt        # Зависимости: pyserial и др.
