@@ -1,4 +1,5 @@
 # core/control_manager.py
+import json
 import logging
 import time
 import os
@@ -49,6 +50,7 @@ class ControlManager(Thread):
             state.safety_monitors = {}
         state.safety_monitors[press_id] = self.safety
 
+        self.press_controller = None  # Будет создан при старте
         press_controller = PressController(press_id, config)
         # Желаемое состояние
         self.desired = {
@@ -60,13 +62,39 @@ class ControlManager(Thread):
 
         # Принудительное выключение при старте
         self._ensure_all_off()
-        #state.set(f"press_{press_id}_target_pressure", 0.0)  # Например
-        #state.set(f"press_{self.press_id}_target_temp", 20.0)
+        # state.set(f"press_{press_id}_target_pressure", 0.0)  # Например
+        # state.set(f"press_{self.press_id}_target_temp", 20.0)
         self.logger.info(f"CM Пресс-{self.press_id} ControlManager инициализирован. Все выходы выключены.")
 
         # Инициализация контроллеров
         self.temp_controller = TemperatureController(press_id)
         self.temp_controller.start()  # 🔥 Запускаем поток
+
+    def _on_start_pressed(self):
+        if self.press_controller and self.press_controller.running:
+            self.logger.info(f"CM Пресс-{self.press_id}: уже запущен")
+            return
+
+        # Создаём и запускаем
+        self.press_controller = PressController(press_id=self.press_id, config=self.config)
+        self.press_controller.start()
+        self.logger.info(f"CM Пресс-{self.press_id}: программа запущена")
+
+    def _on_stop_pressed(self):
+        if self.press_controller and self.press_controller.running:
+            self.press_controller.stop()
+            self.logger.info(f"CM Пресс-{self.press_id}: останов по кнопке")
+        else:
+            self.logger.info(f"CM Пресс-{self.press_id}: не запущен")
+
+    def _on_pause_pressed(self):
+        if self.press_controller and self.press_controller.running:
+            if self.press_controller.paused:
+                self.press_controller.resume()
+                self.logger.info(f"CM Пресс-{self.press_id}: возобновлён")
+            else:
+                self.press_controller.pause()
+                self.logger.info(f"CM Пресс-{self.press_id}: на паузе")
 
     def run(self):
         self.logger.info(f"CM Пресс-{self.press_id} ControlManager запущен")
@@ -79,7 +107,6 @@ class ControlManager(Thread):
             except Exception as e:
                 self.logger.error(f"Ошибка в цикле: {e}", exc_info=True)
                 time.sleep(1)
-
 
     def _update_desired_state(self):
         self.desired = {
@@ -103,14 +130,19 @@ class ControlManager(Thread):
             self.desired["lamp_preheat"] = True
 
     def _synchronize_outputs(self):
-        """Синхронизация всех DO-модулей"""
-        # 1. Лампы (модуль 32)
-        lamp_state = self._get_lamp_state()
-        self._ensure_do_state(self.lamp_do_module, lamp_state)
+        """Теперь без групповой записи"""
+        if not self.safety.is_safe():
+            self._write_lamp_bit("lamp_error", True)
+            return
+        else:
+            self._write_lamp_bit("lamp_error", False)
 
-        # 2. Нагрев (модуль 34, 35, 36)
-        #heater_state = self._get_heater_state()
-        #self._ensure_do_state(self.heating_do_module, heater_state)
+        # Пишем только нужные биты
+        self._write_lamp_bit("lamp_run", self.desired.get("lamp_run", False))
+        self._write_lamp_bit("lamp_pause", self.desired.get("lamp_pause", False))
+        self._write_lamp_bit("lamp_preheat", self.desired.get("lamp_preheat", False))
+        self._write_lamp_bit("lamp_auto_heat", self.desired.get("lamp_auto_heat", False))
+        self._write_lamp_bit("lamp_pressure", self.desired.get("lamp_pressure", False))
 
         # 3. Доп. клапаны (если нужно — раскомментировать)
         # valve_state = self._get_valve_state()
@@ -118,7 +150,7 @@ class ControlManager(Thread):
 
     def _get_lamp_state(self) -> int:
         state_val = 0
-        #print(self.lamp_config.items())
+        # print(self.lamp_config.items())
         for name, cfg in self.lamp_config.items():
             bit = cfg.get("bit")
             if bit is None:
@@ -127,22 +159,60 @@ class ControlManager(Thread):
                 state_val |= (1 << bit)
         return state_val
 
-    def _get_heater_state(self) -> int:
-        # Здесь может быть логика по зонам
-        return 0x0001 if self.desired["heater"] else 0x0000
+    # core/control_manager.py
+
+    def _write_lamp_bit(self, name: str, on: bool):
+        """
+        Устанавливает состояние лампы по имени из config.
+        Не затрагивает другие биты на модуле.
+        """
+        if name not in self.lamp_config:
+            return
+
+        cfg = self.lamp_config[name]
+        module_id = cfg["module"]
+        bit = cfg["bit"]
+        active_high = cfg.get("type", "active_high") == "active_high"
+
+        # Формируем маску
+        mask = 1 << bit
+
+        # Читаем текущее состояние модуля
+        current = state.read_digital(module_id) or 0
+
+        # Вычисляем желаемое состояние бита
+        if active_high:
+            target_bit = on
+        else:
+            target_bit = not on
+
+        # Обновляем только свой бит
+        if target_bit:
+            new_state = current | mask
+        else:
+            new_state = current & ~mask
+
+        # Только если изменилось — отправляем
+        if current != new_state:
+            low = new_state & 0xFF
+            high = (new_state >> 8) & 0xFF
+            state.set_do_command(module_id, low, high, urgent=True)
+            # Логирование
+            action = "ON" if target_bit else "OFF"
+            self.logger.debug(f"CM Пресс-{self.press_id}: DO-{module_id} bit {bit} ({name}) → {action}")
 
     def _ensure_do_state(self, module_id: str, desired: int):
         """Если текущее состояние не совпадает с желаемым — отправить команду"""
         current = state.get(f"do_state_{module_id}")
-        #print(current )
+        # print(current )
         if current != desired:
             low = desired & 0xFF
             high = (desired >> 8) & 0xFF
             urgent = state.get("urgent_do", {})
             urgent[module_id] = (low, high)
-            #state.set("urgent_do", urgent)
+            # state.set("urgent_do", urgent)
             state.set_do_command(module_id, low, high, urgent=True)
-            #print(f"CM Синхронизация DO-{module_id}: {current or 0:04X} → {desired:04X}")
+            # print(f"CM Синхронизация DO-{module_id}: {current or 0:04X} → {desired:04X}")
 
     def _poll_buttons(self):
         di_value = state.get(f"di_module_{self.di_module}")
@@ -155,8 +225,44 @@ class ControlManager(Thread):
                 self._handle_safety(di2_value)
 
     def _handle_buttons(self, value: int):
-        # Логика опроса кнопок
-        pass
+        """Обработка кнопок на DI-модуле (например, 37)"""
+        for name, cfg in self.btn_config.items():
+            try:
+                module = cfg["module"]
+                bit = cfg["bit"]
+                btn_type = cfg.get("type", "active_high")
+
+                # Проверяем, что это наш модуль
+                if module != str(self.di_module):
+                    continue
+
+                # Читаем бит
+                bit_set = bool(value & (1 << bit))
+
+                # Учитываем тип сигнала
+                if btn_type == "active_low":
+                    button_pressed = not bit_set
+                else:  # active_high
+                    button_pressed = bit_set
+
+                # Реагируем
+                if name == "start_btn" and button_pressed:
+                    self._on_start_pressed()
+
+                elif name == "stop_btn" and button_pressed:
+                    self._on_stop_pressed()
+
+                elif name == "pause_btn" and button_pressed:
+                    self._on_pause_pressed()
+
+                elif name == "preheat_btn" and button_pressed:
+                    self._on_preheat_pressed()
+
+                elif name == "limit_switch" and bit_set:
+                    self._on_limit_switch_reached()
+
+            except Exception as e:
+                self.logger.error(f"CM Ошибка обработки кнопки {name}: {e}")
 
     def _handle_safety(self, value: int):
         # Передаётся в SafetyMonitor
@@ -173,9 +279,60 @@ class ControlManager(Thread):
         for mid in modules:
             state.set_do_command(mid, 0, 0, urgent=True)
 
+    def _on_start_pressed(self):
+        if self.press_controller and self.press_controller.running:
+            self.logger.info(f"CM Пресс-{self.press_id}: start_btn нажата, но программа уже запущена")
+            return
+
+        # Запускаем PressController
+        try:
+            self.press_controller = PressController(press_id=self.press_id, config=self.config)
+            self.press_controller.start()
+            self.logger.info(f"CM Пресс-{self.press_id}: программа запущена по кнопке")
+        except Exception as e:
+            self.logger.error(f"CM Пресс-{self.press_id}: ошибка запуска программы: {e}")
+
+    def _on_pause_pressed(self):
+        if not (self.press_controller and self.press_controller.running):
+            return
+
+        if self.press_controller.paused:
+            self.press_controller.resume()
+            self.logger.info(f"CM Пресс-{self.press_id}: возобновление после паузы")
+        else:
+            self.press_controller.pause()
+            self.logger.info(f"CM Пресс-{self.press_id}: поставлен на паузу")
+
+    def _on_preheat_pressed(self):
+        # Читаем уставку из первого шага программы
+        program_path = f"programs/press{self.press_id}.json"
+        try:
+            with open(program_path, "r", encoding="utf-8") as f:
+                program = json.load(f)
+            first_step = program.get("temp_program", [{}])[0]
+            target_temp = first_step.get("target_temp", 50.0)
+
+            # Устанавливаем уставку
+            state.set(f"press_{self.press_id}_target_temp", target_temp)
+            self.logger.info(f"CM Пресс-{self.press_id}: ручной прогрев до {target_temp}°C")
+
+        except Exception as e:
+            self.logger.error(f"CM Пресс-{self.press_id}: ошибка запуска ручного прогрева: {e}")
+
+    def _on_limit_switch_reached(self):
+        # Можно использовать для синхронизации шагов
+        # Например, завершить шаг "lift_to_limit"
+        state.set(f"press_{self.press_id}_limit_reached", True)
+        self.logger.debug(f"CM Пресс-{self.press_id}: достигнут лимит")
+
+    def _on_stop_pressed(self):
+        if not (self.press_controller and self.press_controller.running):
+            return
+
+        self.press_controller.stop()
+        self.logger.info(f"CM Пресс-{self.press_id}: останов по кнопке")
 
     def stop(self):
-        self._ensure_all_off()
         self.temp_controller.stop()
         self.temp_controller.join(timeout=1.0)
         self.running = False
@@ -184,4 +341,3 @@ class ControlManager(Thread):
     def emergency_stop(self):
         self.stop()
         self.logger.warning(f"CM Пресс-{self.press_id} Аварийная остановка")
-

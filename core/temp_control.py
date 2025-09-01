@@ -12,7 +12,7 @@ import sys
 import threading
 from typing import Optional, List, Dict
 from core.global_state import state  # ✅ Используем шину
-
+from core.pid_controller import PIDController
 
 # Убедимся, что корень проекта в пути
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -45,6 +45,22 @@ class TemperatureController(threading.Thread):
         self.heating = [False] * self.zones
 
         logging.info(f"TC Пресс-{press_id}: TemperatureController инициализирован. Модуль {self.do_module}")
+        self.pids = []
+        self.offsets = []
+
+        # Загрузка конфига
+        with open("config/pid_config.json", "r") as f:
+            pid_cfg = json.load(f)["presses"][press_id - 1]
+
+        for zone_cfg in pid_cfg["zones"]:
+            pid = PIDController(
+                Kp=zone_cfg["Kp"],
+                Ki=zone_cfg["Ki"],
+                Kd=zone_cfg["Kd"],
+                output_limits=(0, 100)  # % включения
+            )
+            self.pids.append(pid)
+            self.offsets.append(zone_cfg["offset"])
 
     def set_target(self, zone: int, temp: float):
         """Установить уставку для зоны (0–7)"""
@@ -185,7 +201,18 @@ class TemperatureController(threading.Thread):
             t = temps[zone]
             if t is None:
                 continue
-            should_heat = t < target_temp - self.hysteresis
+
+            # гистерезис
+            # should_heat = t < target_temp - self.hysteresis
+
+            # PID
+            # Применяем оффсет
+            temp_with_offset = temps[zone] + self.offsets[zone]
+            self.pids[zone].set_setpoint(target_temp)
+
+            # Вычисляем выход
+            output = self.pids[zone].compute(temp_with_offset)
+            should_heat = output > 10  # >10% → включаем
 
             mask = 1 << ch
             if should_heat:

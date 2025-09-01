@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>📈 АПАТЕК — Графики в реальном времени</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+            font-size: 13px;
+            padding: 10px;
+        }
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0 12px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 16px;
+        }
+        .header-bar h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        a {
+            color: #64b5f6;
+            text-decoration: none;
+            font-size: 13px;
+        }
+        .chart-container {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        @media (max-width: 1024px) {
+            .chart-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-bar">
+        <h1>📈 АПАТЕК — Графики в реальном времени</h1>
+        <a href="{{ url_for('index') }}">← Назад на панель</a>
+    </div>
+
+    {% for pid in [1, 2, 3] %}
+    <div class="chart-container">
+        <h3>Пресс {{ pid }}</h3>
+        <div class="chart-row">
+            <div>
+                <canvas id="tempChart{{ pid }}" height="100"></canvas>
+            </div>
+            <div>
+                <canvas id="pressureChart{{ pid }}" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <script>
+        const dataStream = new EventSource('/stream');
+
+        // Храним данные для каждого графика
+        const maxDataPoints = 100;
+        const timeLabels = Array(maxDataPoints).fill('');
+        const datasets = {};
+
+        // Инициализация графиков
+        [1, 2, 3].forEach(pid => {
+            // Температура
+            datasets[`temp${pid}`] = {
+                labels: [...timeLabels],
+                datasets: [
+                    {
+                        label: 'Уставка',
+                        borderColor: '#64b5f6',
+                        tension: 0.1,
+                        borderWidth: 1
+                    }
+                ]
+            };
+            for (let i = 0; i < 7; i++) {
+                datasets[`temp${pid}`].datasets.push({
+                    label: `Зона ${i+1}`,
+                    borderColor: ['#f44336', '#ff9800', '#4caf50', '#2196f3', '#9c27b0', '#ffeb3b', '#00bcd4'][i],
+                    tension: 0.1,
+                    borderWidth: 1,
+                    pointRadius: 0
+                });
+            }
+            new Chart(document.getElementById(`tempChart${pid}`), {
+                type: 'line',
+                data: datasets[`temp${pid}`],
+                options: {
+                    animation: false,
+                    scales: { y: { min: 0, max: 200 } },
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+
+            // Давление
+            datasets[`pressure${pid}`] = {
+                labels: [...timeLabels],
+                datasets: [
+                    { label: 'Уставка', borderColor: '#64b5f6', tension: 0.1, borderWidth: 1 },
+                    { label: 'Фактическое', borderColor: '#f44336', tension: 0.1, borderWidth: 1 }
+                ]
+            };
+            new Chart(document.getElementById(`pressureChart${pid}`), {
+                type: 'line',
+                data: datasets[`pressure${pid}`],
+                options: {
+                    animation: false,
+                    scales: { y: { min: 0, max: 10 } },
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+        });
+
+        let updateCounter = 0;
+        const updateInterval = 2; // Обновлять каждый 2-й SSE-пакет
+
+        dataStream.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+
+                updateCounter++;
+                if (updateCounter % updateInterval !== 0) return;
+
+                const now = new Date().toLocaleTimeString();
+
+                data.presses.forEach(p => {
+                    const tempData = [p.temp_target];
+                    for (let i = 0; i < 7; i++) {
+                        tempData.push(p.temps[i] !== null ? p.temps[i] : null);
+                    }
+
+                    const pressureData = [
+                        p.pressure_target !== null ? p.pressure_target : null,
+                        p.pressure !== null ? p.pressure : null
+                    ];
+
+                    // Добавляем новые данные
+                    Object.values(datasets[`temp${p.id}`].datasets).forEach((ds, idx) => {
+                        ds.data.push(tempData[idx]);
+                        if (ds.data.length > maxDataPoints) ds.data.shift();
+                    });
+
+                    datasets[`pressure${p.id}`].datasets[0].data.push(pressureData[0]);
+                    datasets[`pressure${p.id}`].datasets[1].data.push(pressureData[1]);
+                    if (datasets[`pressure${p.id}`].datasets[0].data.length > maxDataPoints) {
+                        datasets[`pressure${p.id}`].datasets[0].data.shift();
+                        datasets[`pressure${p.id}`].datasets[1].data.shift();
+                    }
+
+                    // Обновляем метки времени
+                    datasets[`temp${p.id}`].labels.push(now);
+                    if (datasets[`temp${p.id}`].labels.length > maxDataPoints) {
+                        datasets[`temp${p.id}`].labels.shift();
+                    }
+                    datasets[`pressure${p.id}`].labels.push(now);
+                    if (datasets[`pressure${p.id}`].labels.length > maxDataPoints) {
+                        datasets[`pressure${p.id}`].labels.shift();
+                    }
+
+                    // Обновляем графики
+                    Chart.getChart(`tempChart${p.id}`).update();
+                    Chart.getChart(`pressureChart${p.id}`).update();
+                });
+            } catch (e) {
+                console.error("Ошибка графика:", e);
+            }
+        };
+    </script>
+</body>
+</html>

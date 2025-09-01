@@ -8,13 +8,16 @@ import os
 import atexit
 from typing import Dict, Any
 from core.hardware_interface import HardwareInterface
-from core.press_controller import PressController
 from core.hardware_daemon import HardwareDaemon
 from core.web_interface import WebInterface
 from core.control_manager import ControlManager
 from core.global_state import state
+from logging.handlers import TimedRotatingFileHandler
 
 # Настройка логирования
+handler = TimedRotatingFileHandler("app.log", when="midnight", interval=1, backupCount=7)
+handler.suffix = "%Y-%m-%d"
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [MAIN] %(levelname)s: %(message)s',
@@ -26,7 +29,7 @@ logging.basicConfig(
 
 # Глобальные переменные
 hardware_interface: HardwareInterface = None
-press_controllers: Dict[int, PressController] = {}
+# press_controllers: Dict[int, PressController] = {}
 running = True
 daemon: HardwareDaemon = None  # будет инициализирован в main()
 control_managers = {}
@@ -59,25 +62,25 @@ def start_press(press_id: int):
     if press_id < 1 or press_id > 3:
         logging.warning("M Пресс должен быть 1, 2 или 3.")
         return
-
-    # Всегда создаём новый экземпляр
-    pc = PressController(press_id=press_id, config=hw_config)
-    press_controllers[press_id] = pc
-    pc.start()
-    logging.info(f"M Пресс-{press_id} запущен.")
+    cm = control_managers.get(press_id)
+    if cm:
+        cm._on_start_pressed()
+    else:
+        logging.warning(f"M ControlManager для пресса {press_id} не найден")
 
 
 def stop_press(press_id: int, emergency: bool = False):
-    if press_id not in press_controllers:
+    cm = control_managers.get(press_id)
+    if not cm:
         logging.info(f"M Пресс-{press_id} не запущен.")
         return
 
-    pc = press_controllers[press_id]
     if emergency:
-        pc.emergency_stop()
+        if cm.press_controller and cm.press_controller.running:
+            cm.press_controller.emergency_stop()
         logging.warning(f"M Пресс-{press_id}: аварийная остановка!")
     else:
-        pc.stop()
+        cm._on_stop_pressed()
         logging.info(f"M Пресс-{press_id}: останов по запросу.")
 
 
@@ -162,16 +165,16 @@ def command_loop():
                 stop_press(3)
             elif cmd == "7":
                 logging.warning("M Аварийная остановка всех прессов!")
-                # 1. Остановить все контроллеры
-                for pid in list(press_controllers.keys()):
-                    pc = press_controllers[pid]
-                    if pc.is_alive():
-                        pc.emergency_stop()
-                        pc.join(timeout=0.5)
 
-                # 2. Принудительно выключить все DO-модули нагрева
-                do_modules = ["34", "35", "36"]  # Пресс 1, 2, 3
-                for mod in do_modules:
+                # 1. Остановить все PressController через ControlManager
+                for pid in [1, 2, 3]:
+                    cm = control_managers.get(pid)
+                    if cm and cm.press_controller and cm.press_controller.running:
+                        cm.press_controller.emergency_stop()
+                        cm.press_controller.join(timeout=0.5)
+                        logging.info(f"M Пресс-{pid}: emergency_stop вызван через ControlManager")
+
+                for mod in ["31", "32", "34", "35", "36"]:
                     state.write_do(mod, 0, 0)
                     state.set(f"do_state_{mod}", 0)
                     logging.info(f"M Аварийно выключено: DO-{mod}")
@@ -213,12 +216,6 @@ def cleanup():
     global running, daemon, hardware_interface, control_managers
     running = False
     logging.info("M Выполняется остановка системы...")
-
-    # Остановка PressController
-    for pc in press_controllers.values():
-        if pc.running:
-            pc.stop()
-            pc.join(timeout=1.0)
 
     # Остановка ControlManager
     for cm in control_managers.values():
@@ -298,6 +295,13 @@ def print_structured_state():
 atexit.register(cleanup)
 
 
+def emergency_stop_all():
+    for pid in [1, 2, 3]:
+        cm = control_managers.get(pid)
+        if cm:
+            cm.emergency_stop()
+
+
 def main():
     global hardware_interface, daemon, hw_config, control_managers  # ✅ Добавь hw_config
 
@@ -322,7 +326,8 @@ def main():
         cm.start()
         control_managers[pid] = cm
         # Создаём PressController, но НЕ запускаем
-        press_controllers[pid] = PressController(press_id=pid, config=hw_config)
+        # press_controllers[pid] = PressController(press_id=pid, config=hw_config)
+
 
     cmd_thread = threading.Thread(target=command_loop, daemon=True)
     cmd_thread.start()

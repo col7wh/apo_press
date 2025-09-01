@@ -14,26 +14,36 @@
             overflow: hidden;
         }
         .container {
-            padding: 8px;
+            padding: 10px;
         }
         .header-bar {
             display: flex;
             justify-content: space-between;
-            padding: 4px 0 8px;
+            align-items: center;
+            padding: 6px 0 10px;
             border-bottom: 1px solid #333;
             margin-bottom: 12px;
         }
+        .header-bar h1 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .header-bar span {
+            font-size: 12px;
+            color: #bbb;
+        }
+
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            height: calc(100vh - 60px);
+            height: calc(100vh - 70px);
             gap: 12px;
         }
         .press {
             background: #1e1e1e;
             border: 1px solid #333;
             border-radius: 8px;
-            padding: 8px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
             font-size: 13px;
@@ -49,7 +59,8 @@
         .status {
             padding: 2px 8px;
             border-radius: 12px;
-            font-size: 12px;
+            font-size: 11px;
+            font-weight: 500;
         }
         .running { background: #43a047; color: white; }
         .stopped { background: #e53935; color: white; }
@@ -57,57 +68,71 @@
 
         .temps {
             font-family: 'Courier New', monospace;
-            font-size: 16px;
+            font-size: 15px;
             text-align: center;
             margin: 4px 0;
+            color: #64b5f6;
+            font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            color: #64b5f6;
         }
 
         .info-row {
             display: flex;
             justify-content: space-between;
             margin: 2px 0;
-            font-size: 12px;
+            font-size: 11.5px;
             color: #bbb;
         }
 
+        /* Зоны нагрева — 7 зон, 4 + 3 */
         .zones {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            display: flex;
+            flex-wrap: wrap;
             gap: 4px;
             margin: 6px 0;
+            justify-content: center;
         }
         .zone {
             text-align: center;
+            width: 26px;
+            font-size: 11px;
         }
         .lamp {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
             margin: 0 auto 2px;
             border: 1px solid #555;
         }
-        .lamp.on { background: #f44336; box-shadow: 0 0 8px #d32f2f; }
+        .lamp.on { background: #f44336; box-shadow: 0 0 6px #d32f2f; }
         .lamp.off { background: #424242; }
 
-        .io {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4px;
+        /* Блоки с лампами (входы/выходы) — 4 в ряд */
+        .io-section {
             margin-top: 6px;
-            font-size: 11px;
+            border-top: 1px solid #333;
+            padding-top: 5px;
+        }
+        .io-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
         }
         .io-item {
             display: flex;
+            flex-direction: column;
             align-items: center;
+            font-size: 10.5px;
+            text-align: center;
         }
         .io-label {
-            margin-left: 4px;
+            margin-top: 2px;
+            white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            max-width: 50px;
         }
     </style>
 </head>
@@ -115,7 +140,7 @@
     <div class="container">
         <div class="header-bar">
             <h1>🏭 АПАТЕК — Панель управления</h1>
-            <a href="{{ url_for('edit_program') }}" class="btn btn-primary">Редактировать программу</a>
+            <a href="{{ url_for('edit_program') }}" style="font-size:12px">Редактировать программу</a>
             <span><strong>Время:</strong> <span id="ts">-</span></span>
         </div>
 
@@ -130,7 +155,6 @@
 
         const eventSource = new EventSource('/stream');
 
-        // Маппинг типов шагов
         const stepLabels = {
             'ramp_temp': 'Нагрев',
             'hold': 'Выдержка',
@@ -140,6 +164,22 @@
             'open_mold': 'Открыть форму',
             'pause': 'Пауза',
             'set_pressure': 'Уст. давления'
+        };
+
+        const outputLabels = {
+            'lamp_run': 'Запуск',
+            'lamp_pause': 'Пауза',
+            'lamp_preheat': 'Прогрев',
+            'lamp_auto_heat': 'Авт. нагрев',
+            'lamp_pressure': 'Давление'
+        };
+
+        const inputLabels = {
+            'start_btn': 'Старт',
+            'stop_btn': 'Стоп',
+            'pause_btn': 'Пауза',
+            'preheat_btn': 'Прогрев',
+            'limit_switch': 'Лимит'
         };
 
         eventSource.onmessage = function(event) {
@@ -153,7 +193,6 @@
                     const pressure = p.pressure !== null ? p.pressure.toFixed(1) : 'N/A';
                     const pressureTarget = p.pressure_target !== null ? p.pressure_target.toFixed(1) : 'N/A';
 
-                    // Определяем статус
                     let statusClass, statusText;
                     if (!p.running) {
                         statusClass = "stopped";
@@ -166,7 +205,6 @@
                         statusText = "Р";
                     }
 
-                    // Определяем шаг
                     const index = typeof p.current_step.index === 'number' ? p.current_step.index + 1 : '–';
                     const type = stepLabels[p.current_step.type] || p.current_step.type;
                     const elapsed = p.current_step.elapsed || 0;
@@ -195,6 +233,7 @@
                             <span>Давл: ${pressure} / ${pressureTarget} МПа</span>
                         </div>
 
+                        <!-- Зоны нагрева -->
                         <div class="zones">
                             ${p.heating_bits.slice(0,7).map((on, i) => `
                                 <div class="zone">
@@ -204,22 +243,28 @@
                             `).join('')}
                         </div>
 
-                        <div class="io">
-                            ${p.inputs.slice(0,4).map(item => `
-                                <div class="io-item">
-                                    <div class="lamp ${item.on ? 'on' : 'off'}"></div>
-                                    <span class="io-label">${item.name}</span>
-                                </div>
-                            `).join('')}
+                        <!-- Кнопки (входы) -->
+                        <div class="io-section">
+                            <div class="io-grid">
+                                ${p.inputs.map(item => `
+                                    <div class="io-item">
+                                        <div class="lamp ${item.on ? 'on' : 'off'}"></div>
+                                        <span class="io-label">${inputLabels[item.name] || item.name}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
 
-                        <div class="io">
-                            ${p.outputs.slice(0,3).map(item => `
-                                <div class="io-item">
-                                    <div class="lamp ${item.on ? 'on' : 'off'}"></div>
-                                    <span class="io-label">${item.name}</span>
-                                </div>
-                            `).join('')}
+                        <!-- Лампы (выходы) -->
+                        <div class="io-section">
+                            <div class="io-grid">
+                                ${p.outputs.map(item => `
+                                    <div class="io-item">
+                                        <div class="lamp ${item.on ? 'on' : 'off'}"></div>
+                                        <span class="io-label">${outputLabels[item.name] || item.name}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
                     </div>`;
                 }

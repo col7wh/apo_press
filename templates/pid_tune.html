@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>🔧 АПАТЕК — Настройка ПИД</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+            font-size: 13px;
+            padding: 10px;
+        }
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0 12px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 16px;
+        }
+        .header-bar h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        a {
+            color: #64b5f6;
+            text-decoration: none;
+            font-size: 13px;
+        }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+        .tab {
+            padding: 8px 16px;
+            background: #333;
+            border: none;
+            color: #ddd;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background: #1976d2;
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+        th, td {
+            border: 1px solid #555;
+            padding: 6px;
+            text-align: center;
+        }
+        th {
+            background: #2a2a2a;
+            color: #bbb;
+        }
+        td input {
+            width: 100%;
+            padding: 4px;
+            border: 1px solid #555;
+            background: #333;
+            color: #fff;
+            text-align: center;
+        }
+        .actions {
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0d47a1;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-bar">
+        <h1>🔧 АПАТЕК — Настройка ПИД</h1>
+        <a href="{{ url_for('index') }}">← Назад на панель</a>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" data-press="1">Пресс 1</button>
+        <button class="tab" data-press="2">Пресс 2</button>
+        <button class="tab" data-press="3">Пресс 3</button>
+    </div>
+
+    <form id="pidForm">
+        <!-- Пресс 1 -->
+        <div id="press1" class="press-config">
+            <h3>Зоны нагрева (1–8)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Зона</th>
+                        <th>Kp</th>
+                        <th>Ki</th>
+                        <th>Kd</th>
+                        <th>Оффсет</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(8) %}
+                    <tr>
+                        <td>{{ i + 1 }}</td>
+                        <td><input type="number" name="p1_kp_{{ i }}" step="0.1" value="2.5"></td>
+                        <td><input type="number" name="p1_ki_{{ i }}" step="0.01" value="0.15"></td>
+                        <td><input type="number" name="p1_kd_{{ i }}" step="0.1" value="0.8"></td>
+                        <td><input type="number" name="p1_offset_{{ i }}" step="0.1" value="0.0"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <h3>Давление</h3>
+            <table>
+                <tr>
+                    <td>Kp</td>
+                    <td><input type="number" name="p1_press_kp" step="0.1" value="1.2"></td>
+                    <td>Ki</td>
+                    <td><input type="number" name="p1_press_ki" step="0.01" value="0.05"></td>
+                    <td>Kd</td>
+                    <td><input type="number" name="p1_press_kd" step="0.1" value="0.4"></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Пресс 2 и 3 — аналогично (для краткости не показаны, но структура та же) -->
+        <div id="press2" class="press-config" style="display:none;">
+            <h3>Зоны нагрева (1–8)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Зона</th>
+                        <th>Kp</th>
+                        <th>Ki</th>
+                        <th>Kd</th>
+                        <th>Оффсет</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(8) %}
+                    <tr>
+                        <td>{{ i + 1 }}</td>
+                        <td><input type="number" name="p2_kp_{{ i }}" step="0.1" value="2.5"></td>
+                        <td><input type="number" name="p2_ki_{{ i }}" step="0.01" value="0.15"></td>
+                        <td><input type="number" name="p2_kd_{{ i }}" step="0.1" value="0.8"></td>
+                        <td><input type="number" name="p2_offset_{{ i }}" step="0.1" value="0.0"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div id="press3" class="press-config" style="display:none;">
+            <h3>Зоны нагрева (1–8)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Зона</th>
+                        <th>Kp</th>
+                        <th>Ki</th>
+                        <th>Kd</th>
+                        <th>Оффсет</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(8) %}
+                    <tr>
+                        <td>{{ i + 1 }}</td>
+                        <td><input type="number" name="p3_kp_{{ i }}" step="0.1" value="2.5"></td>
+                        <td><input type="number" name="p3_ki_{{ i }}" step="0.01" value="0.15"></td>
+                        <td><input type="number" name="p3_kd_{{ i }}" step="0.1" value="0.8"></td>
+                        <td><input type="number" name="p3_offset_{{ i }}" step="0.1" value="0.0"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="actions">
+            <button type="submit">💾 Сохранить</button>
+            <button type="button" onclick="loadDefaults()">🔄 Сбросить</button>
+        </div>
+    </form>
+
+    <script>
+        // Переключение вкладок
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.press-config').forEach(p => p.style.display = 'none');
+                tab.classList.add('active');
+                document.getElementById(`press${tab.dataset.press}`).style.display = 'block';
+            });
+        });
+
+        // Сохранение
+        document.getElementById('pidForm').onsubmit = function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = isNaN(value) ? value : parseFloat(value);
+            }
+            fetch('/save_pid_config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).then(() => alert('✅ Настройки ПИД сохранены'));
+        };
+
+        function loadDefaults() {
+            // Можно загрузить из /get_pid_config
+            alert('Сброс к умолчанию (реализуется)');
+        }
+    </script>
+</body>
+</html>

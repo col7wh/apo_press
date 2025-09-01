@@ -175,17 +175,25 @@ class WebInterface(threading.Thread):
                                             "on": bool(di_value & (1 << bit))
                                         })
 
-                            try:
-                                lamp_do = self.hw_config["common"]["do_module_2"]
-                                lamp_state = state.get(f"do_state_{lamp_do}", 0)
-                            except:
-                                lamp_state = 0
+                            # 🔥 ИСПРАВЛЕНО: читаем lamp_state для каждого пресса по его config
+                            outputs = []
+                            if "status_outputs" in press_cfg:
+                                for name, cfg in press_cfg["status_outputs"].items():
+                                    module_id = cfg["module"]
+                                    bit = cfg["bit"]
+                                    active_high = cfg.get("type", "active_high") == "active_high"
 
-                            outputs = [
-                                {"name": "lamp_run", "on": bool(lamp_state & (1 << 3))},
-                                {"name": "lamp_pause", "on": bool(lamp_state & (1 << 2))},
-                                {"name": "lamp_preheat", "on": bool(lamp_state & (1 << 4))},
-                            ]
+                                    # Читаем состояние модуля
+                                    mod_state = state.get(f"do_state_{module_id}", 0)
+                                    bit_set = bool(mod_state & (1 << bit))
+
+                                    # Учитываем тип
+                                    is_on = bit_set if active_high else not bit_set
+
+                                    outputs.append({
+                                        "name": name,
+                                        "on": is_on
+                                    })
 
                             temp_step = state.get(f"press_{pid}_current_step_temperature", {})
                             press_step = state.get(f"press_{pid}_current_step_pressure", {})
@@ -226,6 +234,10 @@ class WebInterface(threading.Thread):
                     time.sleep(1.0)
 
             return Response(generate(), mimetype="text/event-stream")
+
+        @self.app.route("/graphs")
+        def graphs():
+            return render_template("graphs.html")
 
     def _get_timestamp(self):
         return datetime.now().strftime("%H:%M:%S")

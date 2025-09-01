@@ -9,12 +9,14 @@ from typing import Dict, Any, List
 from core.step_executor import StepExecutor
 from core.safety_monitor import SafetyMonitor
 from core.global_state import state
+from core.data_logger import DataLogger
 
 
 class PressController(threading.Thread):
     def __init__(self, press_id: int, config: dict):
         super().__init__(name=f"PressCtrl-{press_id}", daemon=True)
         self.press_id = press_id
+        self.logger = DataLogger()
         self.running = False
         self.completed = False
         self.paused = False
@@ -50,6 +52,8 @@ class PressController(threading.Thread):
         state.set(f"press_{self.press_id}_completed", False)
         self.running = True
         self.completed = False
+
+        self.logger.start(self.press_id)
         logging.info("=====================================================================================")
         logging.info(f"РС Пресс-{self.press_id}: запуск программы (temp: {len(temp_prog)}, pressure: {len(press_prog)})")
         # logging.info(f"РС Пресс-{self.press_id}: выполнение ({program})")
@@ -67,6 +71,8 @@ class PressController(threading.Thread):
             # Ничего не делаем — StepExecutor работает сам
             time.sleep(0.1)
 
+        # Перед остановкой
+        self.logger.stop()
         # Если вышли из цикла — останавливаем executor
         if self.executor and self.executor.is_alive():
             logging.info(f"РС Пресс-{self.press_id}: остановка StepExecutor")
@@ -76,6 +82,7 @@ class PressController(threading.Thread):
         state.set(f"press_{self.press_id}_running", False)
         state.set(f"press_{self.press_id}_paused", False)
         state.set(f"press_{self.press_id}_completed", True)
+
         self.running = False
         self.completed = True
         logging.info(f"РС Пресс-{self.press_id}: программа завершена.")
@@ -85,6 +92,7 @@ class PressController(threading.Thread):
             return
 
         logging.info(f"РС Пресс-{self.press_id}: остановка по запросу")
+        self.logger.stop()
         self.running = False
         state.set(f"press_{self.press_id}_running", False)
         state.set(f"press_{self.press_id}_paused", False)
@@ -120,13 +128,18 @@ class PressController(threading.Thread):
             self.executor.stop()
         self.safety.emergency = True
 
+    # В PressController
     def pause(self):
-        """Пауза"""
-        state.set(f"press_{self.press_id}_paused", True)
-        self.paused = True
-        state.set(f"press_{self.press_id}_step_status", "paused")
-        logging.info(f"РС Пресс-{self.press_id}: поставлен на паузу.")
+        if self.running and not self.paused:
+            self.paused = True
+            state.set(f"press_{self.press_id}_paused", True)
+            logging.info(f"РС Пресс-{self.press_id}: поставлен на паузу.")
 
+    def resume(self):
+        if self.paused:
+            self.paused = False
+            state.set(f"press_{self.press_id}_paused", False)
+            logging.info(f"РС Пресс-{self.press_id}: возобновлён после паузы.")
 
 # -----------------------------
 # Режим отладки: __main__
