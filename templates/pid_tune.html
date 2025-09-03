@@ -13,27 +13,18 @@
             font-size: 13px;
             padding: 10px;
         }
-        .header-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 0 12px;
-            border-bottom: 1px solid #333;
-            margin-bottom: 16px;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
         }
-        .header-bar h1 {
-            font-size: 18px;
-            font-weight: 600;
-        }
-        a {
-            color: #64b5f6;
-            text-decoration: none;
-            font-size: 13px;
+        h1 {
+            color: #1976d2;
+            margin-bottom: 20px;
         }
         .tabs {
             display: flex;
             gap: 4px;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }
         .tab {
             padding: 8px 16px;
@@ -47,186 +38,261 @@
             background: #1976d2;
             color: white;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
+        .form-section {
+            display: none;
+            background: #1e1e1e;
+            padding: 16px;
+            border: 1px solid #333;
+            border-radius: 8px;
             margin-bottom: 20px;
-            font-size: 12px;
         }
-        th, td {
-            border: 1px solid #555;
-            padding: 6px;
-            text-align: center;
+        .form-section.active {
+            display: block;
         }
-        th {
-            background: #2a2a2a;
+        .form-group {
+            margin: 10px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
             color: #bbb;
         }
-        td input {
-            width: 100%;
-            padding: 4px;
+        input, select, button {
+            padding: 6px;
             border: 1px solid #555;
+            border-radius: 4px;
             background: #333;
             color: #fff;
-            text-align: center;
+            font-size: 13px;
         }
-        .actions {
-            margin: 20px 0;
+        input[readonly] {
+            background: #2a2a2a;
+            color: #888;
         }
         button {
-            padding: 8px 16px;
             background: #1976d2;
             color: white;
             border: none;
-            border-radius: 4px;
+            padding: 8px 12px;
             cursor: pointer;
         }
         button:hover {
             background: #0d47a1;
         }
+        .step {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px;
+            background: #2a2a2a;
+            border-radius: 6px;
+        }
+        .step button {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        .time-summary {
+            font-size: 14px;
+            color: #64b5f6;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .actions {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            background: #43a047;
+        }
+        .btn-secondary {
+            background: #fb8c00;
+        }
+        .btn-danger {
+            background: #e53935;
+        }
     </style>
 </head>
 <body>
-    <div class="header-bar">
-        <h1>🔧 АПАТЕК — Настройка ПИД</h1>
-        <a href="{{ url_for('index') }}">← Назад на панель</a>
-    </div>
+    <div class="container">
+        <h1>🔧 Настройка ПИД-регуляторов</h1>
 
-    <div class="tabs">
-        <button class="tab active" data-press="1">Пресс 1</button>
-        <button class="tab" data-press="2">Пресс 2</button>
-        <button class="tab" data-press="3">Пресс 3</button>
-    </div>
+        <div class="tabs">
+            <button class="tab active" data-tab="press1">Пресс 1</button>
+            <button class="tab" data-tab="press2">Пресс 2</button>
+            <button class="tab" data-tab="press3">Пресс 3</button>
+        </div>
 
-    <form id="pidForm">
         <!-- Пресс 1 -->
-        <div id="press1" class="press-config">
-            <h3>Зоны нагрева (1–8)</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Зона</th>
-                        <th>Kp</th>
-                        <th>Ki</th>
-                        <th>Kd</th>
-                        <th>Оффсет</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for i in range(8) %}
-                    <tr>
-                        <td>{{ i + 1 }}</td>
-                        <td><input type="number" name="p1_kp_{{ i }}" step="0.1" value="2.5"></td>
-                        <td><input type="number" name="p1_ki_{{ i }}" step="0.01" value="0.15"></td>
-                        <td><input type="number" name="p1_kd_{{ i }}" step="0.1" value="0.8"></td>
-                        <td><input type="number" name="p1_offset_{{ i }}" step="0.1" value="0.0"></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div id="press1" class="form-section active">
+            <h3>Параметры нагрева (зоны 1–8)</h3>
+            <div id="zones1"></div>
+            <div class="time-summary">Каждая зона: Kp, Ki, Kd, Оффсет</div>
 
-            <h3>Давление</h3>
-            <table>
-                <tr>
-                    <td>Kp</td>
-                    <td><input type="number" name="p1_press_kp" step="0.1" value="1.2"></td>
-                    <td>Ki</td>
-                    <td><input type="number" name="p1_press_ki" step="0.01" value="0.05"></td>
-                    <td>Kd</td>
-                    <td><input type="number" name="p1_press_kd" step="0.1" value="0.4"></td>
-                </tr>
-            </table>
+            <h3>Параметры давления</h3>
+            <div class="step">
+                <label>Kp</label>
+                <input type="number" id="p1_press_kp" step="0.1" value="1.2">
+                <label>Ki</label>
+                <input type="number" id="p1_press_ki" step="0.01" value="0.05">
+                <label>Kd</label>
+                <input type="number" id="p1_press_kd" step="0.1" value="0.4">
+            </div>
+
+            <div class="actions">
+                <button class="btn" onclick="saveCurrent(1)">💾 Сохранить</button>
+                <button class="btn btn-secondary" onclick="saveAsCurrent(1)">💾 Сохранить как…</button>
+                <button class="btn btn-danger" onclick="loadIntoPress(1)">📂 Загрузить</button>
+            </div>
         </div>
 
-        <!-- Пресс 2 и 3 — аналогично (для краткости не показаны, но структура та же) -->
-        <div id="press2" class="press-config" style="display:none;">
-            <h3>Зоны нагрева (1–8)</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Зона</th>
-                        <th>Kp</th>
-                        <th>Ki</th>
-                        <th>Kd</th>
-                        <th>Оффсет</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for i in range(8) %}
-                    <tr>
-                        <td>{{ i + 1 }}</td>
-                        <td><input type="number" name="p2_kp_{{ i }}" step="0.1" value="2.5"></td>
-                        <td><input type="number" name="p2_ki_{{ i }}" step="0.01" value="0.15"></td>
-                        <td><input type="number" name="p2_kd_{{ i }}" step="0.1" value="0.8"></td>
-                        <td><input type="number" name="p2_offset_{{ i }}" step="0.1" value="0.0"></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <!-- Пресс 2 -->
+        <div id="press2" class="form-section">
+            <h3>Параметры нагрева (зоны 1–8)</h3>
+            <div id="zones2"></div>
+            <div class="time-summary">Каждая зона: Kp, Ki, Kd, Оффсет</div>
+
+            <h3>Параметры давления</h3>
+            <div class="step">
+                <label>Kp</label>
+                <input type="number" id="p2_press_kp" step="0.1" value="1.2">
+                <label>Ki</label>
+                <input type="number" id="p2_press_ki" step="0.01" value="0.05">
+                <label>Kd</label>
+                <input type="number" id="p2_press_kd" step="0.1" value="0.4">
+            </div>
+
+            <div class="actions">
+                <button class="btn" onclick="saveCurrent(2)">💾 Сохранить</button>
+                <button class="btn btn-secondary" onclick="saveAsCurrent(2)">💾 Сохранить как…</button>
+                <button class="btn btn-danger" onclick="loadIntoPress(2)">📂 Загрузить</button>
+            </div>
         </div>
 
-        <div id="press3" class="press-config" style="display:none;">
-            <h3>Зоны нагрева (1–8)</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Зона</th>
-                        <th>Kp</th>
-                        <th>Ki</th>
-                        <th>Kd</th>
-                        <th>Оффсет</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for i in range(8) %}
-                    <tr>
-                        <td>{{ i + 1 }}</td>
-                        <td><input type="number" name="p3_kp_{{ i }}" step="0.1" value="2.5"></td>
-                        <td><input type="number" name="p3_ki_{{ i }}" step="0.01" value="0.15"></td>
-                        <td><input type="number" name="p3_kd_{{ i }}" step="0.1" value="0.8"></td>
-                        <td><input type="number" name="p3_offset_{{ i }}" step="0.1" value="0.0"></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <!-- Пресс 3 -->
+        <div id="press3" class="form-section">
+            <h3>Параметры нагрева (зоны 1–8)</h3>
+            <div id="zones3"></div>
+            <div class="time-summary">Каждая зона: Kp, Ki, Kd, Оффсет</div>
 
-        <div class="actions">
-            <button type="submit">💾 Сохранить</button>
-            <button type="button" onclick="loadDefaults()">🔄 Сбросить</button>
+            <h3>Параметры давления</h3>
+            <div class="step">
+                <label>Kp</label>
+                <input type="number" id="p3_press_kp" step="0.1" value="1.2">
+                <label>Ki</label>
+                <input type="number" id="p3_press_ki" step="0.01" value="0.05">
+                <label>Kd</label>
+                <input type="number" id="p3_press_kd" step="0.1" value="0.4">
+            </div>
+
+            <div class="actions">
+                <button class="btn" onclick="saveCurrent(3)">💾 Сохранить</button>
+                <button class="btn btn-secondary" onclick="saveAsCurrent(3)">💾 Сохранить как…</button>
+                <button class="btn btn-danger" onclick="loadIntoPress(3)">📂 Загрузить</button>
+            </div>
         </div>
-    </form>
+    </div>
 
     <script>
-        // Переключение вкладок
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.press-config').forEach(p => p.style.display = 'none');
-                tab.classList.add('active');
-                document.getElementById(`press${tab.dataset.press}`).style.display = 'block';
-            });
-        });
+        const config = {
+            press1: { zones: [], pressure_pid: {} },
+            press2: { zones: [], pressure_pid: {} },
+            press3: { zones: [], pressure_pid: {} }
+        };
 
-        // Сохранение
-        document.getElementById('pidForm').onsubmit = function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            const data = {};
-            for (let [key, value] of formData.entries()) {
-                data[key] = isNaN(value) ? value : parseFloat(value);
+        // Загрузка текущих значений
+        fetch('/get_pid_config')
+            .then(r => r.json())
+            .then(data => {
+                for (let pid = 1; pid <= 3; pid++) {
+                    const press = data.presses[pid - 1];
+                    config[`press${pid}`].zones = press.zones;
+                    config[`press${pid}`].pressure_pid = press.pressure_pid;
+                }
+                renderAll();
+            });
+
+        function renderAll() {
+            for (let pid = 1; pid <= 3; pid++) {
+                renderZones(pid);
+                const p = config[`press${pid}`].pressure_pid;
+                document.getElementById(`p${pid}_press_kp`).value = p.Kp;
+                document.getElementById(`p${pid}_press_ki`).value = p.Ki;
+                document.getElementById(`p${pid}_press_kd`).value = p.Kd;
             }
+        }
+
+        function renderZones(pid) {
+            const container = document.getElementById(`zones${pid}`);
+            container.innerHTML = '';
+            config[`press${pid}`].zones.forEach((zone, i) => {
+                const div = document.createElement('div');
+                div.className = 'step';
+                div.innerHTML = `
+                    <span>Зона ${i+1}</span>
+                    <input type="number" placeholder="Kp" value="${zone.Kp}" step="0.1" onchange="updateZone(${pid}, ${i}, 'Kp', this.value)">
+                    <input type="number" placeholder="Ki" value="${zone.Ki}" step="0.01" onchange="updateZone(${pid}, ${i}, 'Ki', this.value)">
+                    <input type="number" placeholder="Kd" value="${zone.Kd}" step="0.1" onchange="updateZone(${pid}, ${i}, 'Kd', this.value)">
+                    <input type="number" placeholder="Оффсет" value="${zone.offset}" step="0.1" onchange="updateZone(${pid}, ${i}, 'offset', this.value)">
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function updateZone(pid, idx, key, value) {
+            config[`press${pid}`].zones[idx][key] = parseFloat(value) || 0;
+        }
+
+        function saveCurrent(pressId) {
+            const data = {
+                presses: [
+                    config.press1,
+                    config.press2,
+                    config.press3
+                ]
+            };
             fetch('/save_pid_config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            }).then(() => alert('✅ Настройки ПИД сохранены'));
-        };
-
-        function loadDefaults() {
-            // Можно загрузить из /get_pid_config
-            alert('Сброс к умолчанию (реализуется)');
+            }).then(() => alert(`✅ ПИД-параметры пресса-${pressId} сохранены`));
         }
+
+        function saveAsCurrent(pressId) {
+            const data = { "presses": [config.press1, config.press2, config.press3] };
+            const blob = new Blob([JSON.stringify(data, null, 4)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pid_config_press${pressId}.json`;
+            a.click();
+        }
+
+        async function loadIntoPress(pressId) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = async () => {
+                const file = input.files[0];
+                const text = await file.text();
+                const loaded = JSON.parse(text);
+                config[`press${pressId}`] = loaded.presses[pressId - 1];
+                renderZones(pressId);
+            };
+            input.click();
+        }
+
+        // Переключение вкладок
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
     </script>
 </body>
 </html>

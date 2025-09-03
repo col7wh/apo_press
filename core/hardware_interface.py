@@ -3,6 +3,7 @@
 import json
 import time
 import logging
+from logging.handlers import TimedRotatingFileHandler
 from typing import Optional, List, Dict, Any, Union
 from core.global_state import state  # ✅ Добавлен импорт
 import threading
@@ -17,15 +18,25 @@ except ImportError:
 hardware_logger = logging.getLogger('HardwareInterface')
 hardware_logger.setLevel(logging.INFO)
 
-# Проверяем, нет ли уже обработчиков (чтобы избежать дублирования)
 if not hardware_logger.handlers:
-    # Создаём папку, если её нет
     import os
     os.makedirs("logs", exist_ok=True)
-    handler = logging.FileHandler('logs/hardware.log', encoding='utf-8')
+    log_file = "logs/hardware.log"
+
+    handler = TimedRotatingFileHandler(
+        log_file,
+        when="midnight",
+        interval=1,
+        backupCount=7,
+        encoding="utf-8"
+    )
+    handler.suffix = "%Y-%m-%d"
+    handler.extMatch = r"\d{4}-\d{2}-\d{2}"
+
     formatter = logging.Formatter('%(asctime)s [HI] %(levelname)s: %(message)s')
     handler.setFormatter(formatter)
     hardware_logger.addHandler(handler)
+
 
 # 🔥 Ключевая строка: отключаем передачу наверх
 hardware_logger.propagate = False
@@ -149,7 +160,7 @@ class HardwareInterface:
                 # time.sleep(0.2)
                 if self.serial.in_waiting:
                     self.serial.reset_input_buffer()
-                    time.sleep(0.1)
+                    time.sleep(0.05)
 
                 # Отправка
                 self.serial.write((command + "\r\n").encode())
@@ -161,7 +172,7 @@ class HardwareInterface:
                 # 🔁 Ручное чтение с таймаутом
                 raw = b''
                 start_time = time.time()
-                while (time.time() - start_time) < 0.3:  # Макс 500 мс
+                while (time.time() - start_time) < 0.4:  # Макс 500 мс
                     if self.serial.in_waiting:
                         byte = self.serial.read(1)
                         raw += byte
@@ -173,11 +184,11 @@ class HardwareInterface:
 
                 response = raw.decode('utf-8', errors='ignore').strip()
                 # if (len(response) > 5 and len(response) != 57) or len(response) <= 4:
-                    # hardware_logger.info(f"HI DCON: {command} -> {response}")
-                    # return None
+                # hardware_logger.info(f"HI DCON: {command} -> {response}")
+                # return None
                 if command.startswith("#") and len(command) >= 4:
                     self.stats["do_responses"] += 0.5
-                    #print(f"HI DCON: {command} -> {response}")
+                    # print(f"HI DCON: {command} -> {response}")
 
                 # Анализ ответа
                 is_good = _is_valid_response(command, response)
@@ -190,7 +201,7 @@ class HardwareInterface:
 
                     if self.serial.in_waiting:
                         self.serial.reset_input_buffer()
-                    time.sleep(0.05)  # Даём шине "передохнуть"
+                    time.sleep(0.04)  # Даём шине "передохнуть"
 
                 return response if is_good else None
 
@@ -233,8 +244,8 @@ class HardwareInterface:
             mid = f"{int(module_id):02d}"
             command = f"@{mid}"
             response = self._send_command(command)
-            #if int(module_id) ==34:
-                #print(f"HI2 DCON: {command} -> {response}")
+            # if int(module_id) ==34:
+            # print(f"HI2 DCON: {command} -> {response}")
             self.stats["di_responses"] += 1
             if response and response.startswith('>'):
                 hex_str = response[1:].strip()
@@ -265,28 +276,30 @@ class HardwareInterface:
         mid = f"{int(module_id):02d}"
         cmd_low = f"#{mid}00{byte_low:02X}"
         cmd_high = f"#{mid}0B{byte_high:02X}"
-        #print(f"HI write_do вызван: module={module_id}, low={byte_low:02X}, high={byte_high:02X}")
+        # print(f"HI write_do вызван: module={module_id}, low={byte_low:02X}, high={byte_high:02X}")
         hardware_logger.info(f"HI write_do вызван: module={module_id}, low={byte_low:02X}, high={byte_high:02X}")
         if self.direct_mode:
             # ✅ Прямая отправка — как в старом режиме
             self._send_command(cmd_low)
-            time.sleep(0.1)
+            time.sleep(0.03)
             self._send_command(cmd_high)
-            #self.stats["do_responses"] += 1
+            # self.stats["do_responses"] += 1
             # hardware_logger.info(f"DO: модуль {mid}, low=0x{byte_low:02X}, high=0x{byte_high:02X} (прямая отправка)")
         else:
-            #self.stats["do_responses"] += 1
+            # self.stats["do_responses"] += 1
             # Определяем приоритет
             if _is_urgent_module(mid):
                 urgent_queue = state.get("urgent_do", {})
                 urgent_queue[mid] = (byte_low, byte_high)
                 state.set("urgent_do", urgent_queue)
-                hardware_logger.info(f"HI DO: модуль {mid}, low=0x{byte_low:02X}, high=0x{byte_high:02X} (в очередь: срочно)")
+                hardware_logger.info(
+                    f"HI DO: модуль {mid}, low=0x{byte_low:02X}, high=0x{byte_high:02X} (в очередь: срочно)")
             else:
                 heating_queue = state.get("heating_do", {})
                 heating_queue[mid] = (byte_low, byte_high)
                 state.set("heating_do", heating_queue)
-                hardware_logger.info(f"HI DO: модуль {mid}, low=0x{byte_low:02X}, high=0x{byte_high:02X} (в очередь: нагрев)")
+                hardware_logger.info(
+                    f"HI DO: модуль {mid}, low=0x{byte_low:02X}, high=0x{byte_high:02X} (в очередь: нагрев)")
 
     def write_do_bit(self, module_id: Union[str, int], channel: int, on: bool):
         """
@@ -302,7 +315,7 @@ class HardwareInterface:
                 # Читаем текущее состояние
                 current = self.read_digital(module_id)
                 if current is None:
-                    #hardware_logger.error(f"HI WDB Не удалось прочитать состояние DO-{module_id}")
+                    # hardware_logger.error(f"HI WDB Не удалось прочитать состояние DO-{module_id}")
                     current = self.read_digital(module_id)
                     if current is None:
                         hardware_logger.error(f"HI WDB 2- Не удалось прочитать состояние DO-{module_id}")
@@ -323,7 +336,7 @@ class HardwareInterface:
                 low = f"#{mid}00{low_byte:02X}"
                 high = f"#{mid}0B{high_byte:02X}"
                 self._send_command(f"#{mid}00{low:02X}")
-                time.sleep(0.05)
+                time.sleep(0.03)
                 self._send_command(f"#{mid}0B{high:02X}")
                 # self.write_do(module_id, low_byte, high_byte)
                 self.stats["do_responses"] += 1
@@ -349,10 +362,10 @@ class HardwareInterface:
         quality = 0
         total = good + bad
 
-        #print(period, total, good, bad)
+        # print(period, total, good, bad)
         if total > 0:
             quality = (good / total) * 100
-            speed = total/period
+            speed = total / period
             hardware_logger.info("-------------------------------------------------------")
             hardware_logger.info(
                 f" DCON Quality: {quality:.1f}% ({good}/{total}) "

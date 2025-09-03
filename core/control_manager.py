@@ -3,13 +3,18 @@ import json
 import logging
 import time
 import os
+from logging.handlers import TimedRotatingFileHandler
 from threading import Thread
 from core.global_state import state
 from core.safety_monitor import SafetyMonitor
 from core.press_controller import PressController
 from core.temp_control import TemperatureController
+from core.pressure_controller import PressureController
 
 os.makedirs("logs", exist_ok=True)
+
+
+# В ControlManager.__init__
 
 
 class ControlManager(Thread):
@@ -18,14 +23,14 @@ class ControlManager(Thread):
         self.press_id = press_id
         self.config = config
 
-        self.logger = logging.getLogger(f"CM  ControlManager-{press_id}")
-        self.logger.setLevel(logging.INFO)
-        if not self.logger.handlers:
-            handler = logging.FileHandler(f"logs/control_{press_id}.log", encoding="utf-8")
-            formatter = logging.Formatter('%(asctime)s [CTRL-%(name)s] %(levelname)s: %(message)s')
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-
+        #self.logger = logging.getLogger(f"CM  ControlManager-{press_id}")
+        #self.logger.setLevel(logging.INFO)
+        #if not self.logger.handlers:
+            #handler = logging.FileHandler(f"logs/control_{press_id}.log", encoding="utf-8")
+            #formatter = logging.Formatter('%(asctime)s [CTRL-%(name)s] %(levelname)s: %(message)s')
+            #handler.setFormatter(formatter)
+            #self.logger.addHandler(handler)
+        self.setup_control_logger()
         # Загрузка конфигурации
         try:
             common = self.config["common"]
@@ -52,6 +57,7 @@ class ControlManager(Thread):
 
         self.press_controller = None  # Будет создан при старте
         press_controller = PressController(press_id, config)
+        self.pressure_controller = PressureController(press_id)
         # Желаемое состояние
         self.desired = {
             "lamp_run": False,
@@ -69,6 +75,28 @@ class ControlManager(Thread):
         # Инициализация контроллеров
         self.temp_controller = TemperatureController(press_id)
         self.temp_controller.start()  # 🔥 Запускаем поток
+
+    def setup_control_logger(self):
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = f"{log_dir}/control_{self.press_id}.log"
+
+        handler = TimedRotatingFileHandler(
+            log_file,
+            when="midnight",
+            interval=1,
+            backupCount=7,
+            encoding="utf-8"
+        )
+        handler.suffix = "%Y-%m-%d"
+        formatter = logging.Formatter('%(asctime)s [CTRL-%(name)s] %(levelname)s: %(message)s')
+        handler.setFormatter(formatter)
+
+        self.logger = logging.getLogger(f"CM_ControlManager-{self.press_id}")
+        self.logger.setLevel(logging.INFO)
+
+        if not self.logger.handlers:
+            self.logger.addHandler(handler)
 
     def _on_start_pressed(self):
         if self.press_controller and self.press_controller.running:
@@ -103,7 +131,15 @@ class ControlManager(Thread):
                 self._update_desired_state()
                 self._synchronize_outputs()
                 self._poll_buttons()
+
+                # 🔥 Обновляем регулятор давления
+                target_pressure = state.get(f"press_{self.press_id}_target_pressure", 0.0)
+                if target_pressure > 0:
+                    self.pressure_controller.set_target_pressure(target_pressure)
+                    self.pressure_controller.update()
+
                 time.sleep(0.1)
+
             except Exception as e:
                 self.logger.error(f"Ошибка в цикле: {e}", exc_info=True)
                 time.sleep(1)

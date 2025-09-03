@@ -1,7 +1,7 @@
 {
   "mode": "real",
   "com_port": "COM3",
-  "baudrate": 9600,
+  "baudrate": 115200,
   "timeout": 1.0,
   "poll_interval": 0.5,
   "log_dcon_traffic": true,

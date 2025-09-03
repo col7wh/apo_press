@@ -14,18 +14,16 @@ from core.control_manager import ControlManager
 from core.global_state import state
 from logging.handlers import TimedRotatingFileHandler
 
-# Настройка логирования
-handler = TimedRotatingFileHandler("app.log", when="midnight", interval=1, backupCount=7)
-handler.suffix = "%Y-%m-%d"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [MAIN] %(levelname)s: %(message)s',
-    handlers=[
-        logging.FileHandler("app.log", encoding="utf-8"),
+
+#logging.basicConfig(
+ #   level=logging.INFO,
+  #  format='%(asctime)s [MAIN] %(levelname)s: %(message)s',
+  #  handlers=[
+   #     logging.FileHandler("app.log", encoding="utf-8"),
         # logging.StreamHandler()
-    ]
-)
+   # ]
+#)
 
 # Глобальные переменные
 hardware_interface: HardwareInterface = None
@@ -34,6 +32,33 @@ running = True
 daemon: HardwareDaemon = None  # будет инициализирован в main()
 control_managers = {}
 
+
+def setup_main_logger():
+    os.makedirs("logs", exist_ok=True)
+    log_file = "logs/app.log"
+
+    handler = TimedRotatingFileHandler(
+        log_file,
+        when="midnight",      # Ротация в полночь
+        interval=1,           # Каждый день
+        backupCount=7,        # Хранить 7 дней
+        encoding="utf-8"
+    )
+    handler.suffix = "%Y-%m-%d"        # app.log.2025-09-01
+    handler.extMatch = r"\d{4}-\d{2}-\d{2}"  # Как распознавать старые
+
+    formatter = logging.Formatter('%(asctime)s [MAIN] %(levelname)s: %(message)s')
+    handler.setFormatter(formatter)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+
+    # Убедимся, что нет дублирующих хендлеров
+    if not logging.getLogger().hasHandlers():
+        logging.getLogger().addHandler(handler)
+
+    logging.info("M Логирование инициализировано")
 
 def load_system_config() -> Dict[str, Any]:
     try:
@@ -304,6 +329,7 @@ def emergency_stop_all():
 
 def main():
     global hardware_interface, daemon, hw_config, control_managers  # ✅ Добавь hw_config
+    setup_main_logger()
 
     config = load_system_config()
     logging.info(f"M Система запущена в режиме: {config['mode']}")

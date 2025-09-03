@@ -1,5 +1,6 @@
 # core/data_logger.py
 import csv
+import logging
 import os
 import time
 from datetime import datetime
@@ -47,19 +48,19 @@ class DataLogger:
             # Запускаем поток
             self.thread = Thread(target=self._log_loop, daemon=True)
             self.thread.start()
-            print(f"DL Пресс-{press_id}: логирование запущено → {filename}")
+            logging.info(f"DL Пресс-{press_id}: логирование запущено → {filename}")
 
     def _log_loop(self):
         last_write = time.time()
         while self.running:
             try:
                 now = time.time()
-                if now - last_write >= 1.0:  # Каждую секунду
+                if now - last_write >= 5.0:  # Каждую секунду
                     self._write_row()
                     last_write = now
                 time.sleep(0.1)
             except Exception as e:
-                print(f"DL Ошибка в логгере: {e}")
+                logging.info(f"DL Ошибка в логгере: {e}")
                 break
 
     def _write_row(self):
@@ -102,7 +103,7 @@ class DataLogger:
                     self.file.flush()
 
         except Exception as e:
-            print(f"DL Ошибка записи строки: {e}")
+            logging.info(f"DL Ошибка записи строки: {e}")
 
     def stop(self):
         with self.lock:
@@ -110,7 +111,7 @@ class DataLogger:
             if self.file:
                 self.file.close()
                 self.file = None
-                print(f"DL Пресс-{self.press_id}: логирование остановлено")
+                logging.info(f"DL Пресс-{self.press_id}: логирование остановлено")
 
     def is_running(self):
         with self.lock:

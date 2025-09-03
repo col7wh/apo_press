@@ -74,6 +74,14 @@ class HardwareDaemon(Thread):
                     "type": "read_di",
                     "module": self.hw.hw_config["common"]["di_module_2"]
                 })
+
+            # --- ЧТЕНИЕ DO (состояние выходов) ---
+            for module_id in self._get_all_do_modules():
+                self.command_queue.append({
+                    "type": "read_do",
+                    "module": module_id
+                })
+
             self.last_di_time = now
 
         if now - self.last_ai_time >= 2.0:
@@ -84,16 +92,9 @@ class HardwareDaemon(Thread):
                     "module": ai_module,
                     "press_id": pid
                 })
-            # --- ЧТЕНИЕ DO (состояние выходов) ---
-            #print("№ 2")
-            for module_id in self._get_all_do_modules():
-                self.command_queue.append({
-                    "type": "read_do",
-                    "module": module_id
-                })
             self.last_ai_time = now
 
-        if now - self.last_pressure_time >= 0.5:
+        if now - self.last_pressure_time >= 0.1:
             pressure_module = self.hw.hw_config["common"].get("ai_pressure_module")
             if pressure_module:
                 self.command_queue.append({

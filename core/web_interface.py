@@ -239,6 +239,63 @@ class WebInterface(threading.Thread):
         def graphs():
             return render_template("graphs.html")
 
+        @self.app.route("/pid_tune")
+        def pid_tune():
+            return render_template("pid_tune.html")
+
+        @self.app.route("/get_pid_config")
+        def get_pid_config():
+            try:
+                with open("config/pid_config.json", "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return jsonify(data)
+            except Exception as e:
+                logging.error(f"Ошибка загрузки pid_config.json: {e}")
+                # Вернём дефолтную структуру
+                return jsonify({
+                    "presses": [
+                        {
+                            "zones": [{"Kp": 2.5, "Ki": 0.15, "Kd": 0.8, "offset": 0.0}] * 8,
+                            "pressure_pid": {"Kp": 1.2, "Ki": 0.05, "Kd": 0.4}
+                        },
+                        {
+                            "zones": [{"Kp": 2.5, "Ki": 0.15, "Kd": 0.8, "offset": 0.0}] * 8,
+                            "pressure_pid": {"Kp": 1.2, "Ki": 0.05, "Kd": 0.4}
+                        },
+                        {
+                            "zones": [{"Kp": 2.5, "Ki": 0.15, "Kd": 0.8, "offset": 0.0}] * 8,
+                            "pressure_pid": {"Kp": 1.2, "Ki": 0.05, "Kd": 0.4}
+                        }
+                    ]
+                })
+
+        @self.app.route("/save_pid_config", methods=["POST"])
+        def save_pid_config():
+            data = request.get_json()
+            # Преобразуем в структуру pid_config.json
+            config = {"presses": []}
+            for pid in [1, 2, 3]:
+                zones = []
+                for i in range(8):
+                    zones.append({
+                        "Kp": data.get(f"p{pid}_kp_{i}", 2.5),
+                        "Ki": data.get(f"p{pid}_ki_{i}", 0.15),
+                        "Kd": data.get(f"p{pid}_kd_{i}", 0.8),
+                        "offset": data.get(f"p{pid}_offset_{i}", 0.0)
+                    })
+                config["presses"].append({
+                    "id": pid,
+                    "zones": zones,
+                    "pressure_pid": {
+                        "Kp": data.get(f"p{pid}_press_kp", 1.2),
+                        "Ki": data.get(f"p{pid}_press_ki", 0.05),
+                        "Kd": data.get(f"p{pid}_press_kd", 0.4)
+                    }
+                })
+            with open("config/pid_config.json", "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+            return "OK"
+
     def _get_timestamp(self):
         return datetime.now().strftime("%H:%M:%S")
 

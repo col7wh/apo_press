@@ -24,6 +24,37 @@
             border-bottom: 1px solid #333;
             margin-bottom: 12px;
         }
+        .nav-buttons {
+        display: flex;
+        gap: 8px;
+        margin-right: 12px;
+        }
+
+        .btn-nav {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #2a2a2a;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 12px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            min-width: 90px;
+            text-align: center;
+        }
+
+        .btn-nav:hover {
+            background: #3a3a3a;
+            color: #ffffff;
+            box-shadow: 0 0 6px rgba(100, 181, 246, 0.3);
+        }
+
+        .btn-nav:active {
+            transform: translateY(1px);
+        }
         .header-bar h1 {
             font-size: 16px;
             font-weight: 600;
@@ -139,10 +170,22 @@
 <body>
     <div class="container">
         <div class="header-bar">
-            <h1>🏭 АПАТЕК — Панель управления</h1>
-            <a href="{{ url_for('edit_program') }}" style="font-size:12px">Редактировать программу</a>
-            <span><strong>Время:</strong> <span id="ts">-</span></span>
-        </div>
+    <h1>🏭 АПАТЕК — Панель управления</h1>
+
+    <div class="nav-buttons">
+        <a href="{{ url_for('graphs') }}" class="btn-nav">
+            <span>📈 Графики</span>
+        </a>
+        <a href="{{ url_for('edit_program') }}" class="btn-nav">
+            <span>🛠️ Редактор</span>
+        </a>
+        <a href="/pid_tune" class="btn-nav">
+            <span>🔧 ПИД-настройка</span>
+        </a>
+    </div>
+
+    <span><strong>Время:</strong> <span id="ts">-</span></span>
+</div>
 
         <div id="data">
             <p style="color: #888; text-align: center;">Загрузка...</p>
