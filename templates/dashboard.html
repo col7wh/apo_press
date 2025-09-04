@@ -309,6 +309,18 @@
                                 `).join('')}
                             </div>
                         </div>
+
+                    <!-- Клапаны -->
+                    <div class="io-section">
+                        <div class="io-grid">
+                            ${p.valve_outputs.map(item => `
+                                <div class="io-item">
+                                    <div class="lamp ${item.on ? 'on' : 'off'}"></div>
+                                    <span class="label">${item.label}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
                     </div>`;
                 }
 

@@ -81,6 +81,22 @@
         button:hover {
             background: #0d47a1;
         }
+        .btn-back {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: #1976d2;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 12px;
+            z-index: 100;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .btn-back:hover {
+            background: #0d47a1;
+        }
         .step {
             display: flex;
             gap: 8px;
@@ -89,6 +105,17 @@
             padding: 8px;
             background: #2a2a2a;
             border-radius: 6px;
+        }
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .field label {
+            font-size: 11px;
+            color: #999;
+            text-align: center;
         }
         .step button {
             padding: 4px 8px;
@@ -119,7 +146,7 @@
 <body>
     <div class="container">
         <h1>🔧 Редактор программ</h1>
-
+        <a href="/" class="btn-back">← Назад</a>
         <div class="tabs">
             <button class="tab active" data-tab="press1">Пресс 1</button>
             <button class="tab" data-tab="press2">Пресс 2</button>
@@ -228,14 +255,29 @@
                 const div = document.createElement('div');
                 div.className = 'step';
                 div.innerHTML = `
+                    <div class="field">
+                        <label>Название шага</label>
                     <select onchange="updateStep(this, 'temp', ${pid}, ${i})">
                         ${Object.values(stepLabels).map(label => `
                             <option value="${label}" ${stepLabels[step.step] === label ? 'selected' : ''}>${label}</option>
                         `).join('')}
                     </select>
-                    <input type="number" placeholder="Цель (°C)" value="${step.target_temp || ''}" step="0.1" onchange="updateStep(this, 'temp', ${pid}, ${i})">
-                    <input type="number" placeholder="Время подъёма (с)" value="${step.ramp_time || ''}" onchange="updateStep(this, 'temp', ${pid}, ${i})">
-                    <input type="number" placeholder="Выдержка (с)" value="${step.hold_time || ''}" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+                    </div>
+
+                    <div class="field">
+                        <label>Цель (°C)</label>
+                        <input type="number" placeholder="Цель (°C)" value="${step.target_temp || ''}" step="0.1" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+                    </div>
+
+                    <div class="field">
+                        <label>Время подъёма (с)</label>
+                        <input type="number" placeholder="Время подъёма (с)" value="${step.ramp_time || ''}" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+                    </div>
+
+                    <div class="field">
+                        <label>Выдержка (с)</label>
+                        <input type="number" placeholder="Выдержка (с)" value="${step.hold_time || ''}" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+                    </div>
                     <button onclick="removeTempStep(${pid}, ${i})">–</button>
                 `;
                 container.appendChild(div);
@@ -253,14 +295,28 @@
                 const hold = step.hold_time !== undefined ? step.hold_time : '';
 
                 div.innerHTML = `
+                     <div class="field">
+                        <label>Название шага</label>
                     <select onchange="updatePressStepType(this, ${pid}, ${i})">
                         ${Object.values(stepLabels).map(label => `
                             <option value="${label}" ${stepLabels[step.step] === label ? 'selected' : ''}>${label}</option>
                         `).join('')}
                     </select>
-                    <input type="number" placeholder="Цель (МПа)" value="${target}" step="0.1" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
-                    <input type="number" placeholder="Время (с)" value="${ramp}" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
-                    <input type="number" placeholder="Выдержка (с)" value="${hold}" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
+                    </div>
+                        <div class="field">
+                            <label>Цель (МПа)</label>
+                            <input type="number" placeholder="Цель (МПа)" value="${target}" step="0.1" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
+                        </div>
+
+                    <div class="field">
+                            <label>Время (с)</label>
+                            <input type="number" placeholder="Время (с)" value="${ramp}" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
+                    </div>
+
+                    <div class="field">
+                            <label>Выдержка (с)</label>
+                            <input type="number" placeholder="Выдержка (с)" value="${hold}" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
+                    </div>
                     <button onclick="removePressStep(${pid}, ${i})">–</button>
                 `;
                 container.appendChild(div);

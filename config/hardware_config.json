@@ -95,8 +95,8 @@
       "valves": {
         "lift_up": { "module": "31", "bit": 14 },
         "lift_down": { "module": "31", "bit": 15 },
-        "open": { "module": "32", "bit": 11 },
-        "close": { "module": "32", "bit": 12 }
+        "open": { "module": "32", "bit": 1 },
+        "close": { "module": "32", "bit": 2 }
       },
       "safety_inputs": {
         "e_stop": {

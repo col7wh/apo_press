@@ -195,6 +195,36 @@ class WebInterface(threading.Thread):
                                         "on": is_on
                                     })
 
+                            # 🔧 Чтение клапанов из hardware_config
+                            valve_outputs = []
+                            if "valves" in press_cfg:
+                                for name, cfg in press_cfg["valves"].items():
+                                    module_id = cfg["module"]
+                                    bit = cfg["bit"]
+
+                                    # Читаем состояние модуля
+                                    mod_state = state.get(f"do_state_{module_id}", 0)
+                                    bit_set = bool(mod_state & (1 << bit))
+
+                                    # Активный уровень
+                                    active_high = cfg.get("type", "active_high") == "active_high"
+                                    is_on = bit_set if active_high else not bit_set
+
+                                    # Человекочитаемое имя
+                                    label_map = {
+                                        "lift_up": "Подъём",
+                                        "lift_down": "Опускание",
+                                        "open": "Давление +",
+                                        "close": "Давление –"
+                                    }
+                                    label = label_map.get(name, name)
+
+                                    valve_outputs.append({
+                                        "name": name,
+                                        "label": label,
+                                        "on": is_on
+                                    })
+
                             temp_step = state.get(f"press_{pid}_current_step_temperature", {})
                             press_step = state.get(f"press_{pid}_current_step_pressure", {})
 
@@ -217,6 +247,7 @@ class WebInterface(threading.Thread):
                                 "pressure_target": state.get(f"press_{pid}_target_pressure", None),
                                 "inputs": inputs,
                                 "outputs": outputs,
+                                "valve_outputs": valve_outputs,  # ✅ Новый блок
                                 "current_step": current_step
                             })
 

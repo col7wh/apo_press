@@ -80,6 +80,22 @@
         button:hover {
             background: #0d47a1;
         }
+        .btn-back {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: #1976d2;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 12px;
+    z-index: 100;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.btn-back:hover {
+    background: #0d47a1;
+}
         .step {
             display: flex;
             gap: 8px;
@@ -118,7 +134,7 @@
 <body>
     <div class="container">
         <h1>🔧 Настройка ПИД-регуляторов</h1>
-
+        <a href="/" class="btn-back">← Назад</a>
         <div class="tabs">
             <button class="tab active" data-tab="press1">Пресс 1</button>
             <button class="tab" data-tab="press2">Пресс 2</button>
@@ -232,9 +248,13 @@
                 div.className = 'step';
                 div.innerHTML = `
                     <span>Зона ${i+1}</span>
+                    <label>Kр</label>
                     <input type="number" placeholder="Kp" value="${zone.Kp}" step="0.1" onchange="updateZone(${pid}, ${i}, 'Kp', this.value)">
+                    <label>Ki</label>
                     <input type="number" placeholder="Ki" value="${zone.Ki}" step="0.01" onchange="updateZone(${pid}, ${i}, 'Ki', this.value)">
+                    <label>Kd</label>
                     <input type="number" placeholder="Kd" value="${zone.Kd}" step="0.1" onchange="updateZone(${pid}, ${i}, 'Kd', this.value)">
+                    <label>Оффсет</label>
                     <input type="number" placeholder="Оффсет" value="${zone.offset}" step="0.1" onchange="updateZone(${pid}, ${i}, 'offset', this.value)">
                 `;
                 container.appendChild(div);
