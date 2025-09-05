@@ -93,7 +93,10 @@ class HardwareInterface:
         self.baudrate = self.config.get("baudrate", 9600)
         self.timeout = self.config.get("timeout", 1.0)
         self.lock = threading.RLock()  # 🔥 Добавлено
-        hardware_logger.info(f"HI Lock создан: {id(self.lock)}")
+
+        port_ = self.config.get("com_port", "COM1")
+
+        hardware_logger.info(f"HI Lock создан: {id(self.lock)}, port {port_}, baudrate {self.baudrate}")
         self.stats = {
             "total_commands": 0,
             "good_responses": 0,
@@ -148,7 +151,7 @@ class HardwareInterface:
             hardware_logger.info("HI Режим симуляции активирован.")
             self.serial = None
 
-    def _send_command(self, command: str) -> Optional[str]:
+    def _send_command_(self, command: str) -> Optional[str]:
         """Отправка команды и получение ответа"""
         # Извлекаем ID модуля из команды
         if command.startswith(("$", "#", "@")) and len(command) >= 3:
@@ -160,14 +163,14 @@ class HardwareInterface:
                 # time.sleep(0.2)
                 if self.serial.in_waiting:
                     self.serial.reset_input_buffer()
-                    time.sleep(0.05)
+                    time.sleep(0.005)
 
                 # Отправка
-                self.serial.write((command + "\r\n").encode())
+                self.serial.write((command + "\r").encode())
 
                 # ⏸️ Пауза после AI-запроса
                 if command.startswith("#") and len(command) == 3:
-                    time.sleep(0.05)  # Небольшая пауза, чтобы начать чтение
+                    time.sleep(0.02)  # Небольшая пауза, чтобы начать чтение
 
                 # 🔁 Ручное чтение с таймаутом
                 raw = b''
@@ -177,10 +180,10 @@ class HardwareInterface:
                         byte = self.serial.read(1)
                         raw += byte
                         # Условие окончания: \n или переполнение
-                        if byte == b'\n' or len(raw) > 100:
+                        if byte == b'\r' or len(raw) > 100:
                             break
                     else:
-                        time.sleep(0.01)  # Не грузим CPU
+                        time.sleep(0.001)  # Не грузим CPU
 
                 response = raw.decode('utf-8', errors='ignore').strip()
                 # if (len(response) > 5 and len(response) != 57) or len(response) <= 4:
@@ -201,7 +204,7 @@ class HardwareInterface:
 
                     if self.serial.in_waiting:
                         self.serial.reset_input_buffer()
-                    time.sleep(0.04)  # Даём шине "передохнуть"
+                    time.sleep(0.01)  # Даём шине "передохнуть"
 
                 return response if is_good else None
 
@@ -211,6 +214,62 @@ class HardwareInterface:
         except Exception as e:
             hardware_logger.error(f"HI Ошибка при отправке команды '{command}': {e}")
             # time.sleep(2)
+            return None
+
+    def _send_command(self, command: str) -> Optional[str]:
+        """Отправка команды и получение ответа"""
+        if command.startswith(("$", "#", "@")) and len(command) >= 3:
+            module_id = command[1:3]
+            self.stats["commands_by_module"][module_id] = self.stats["commands_by_module"].get(module_id, 0) + 1
+
+        try:
+            if self.mode == "real":
+                # Убираем возможный мусор
+                if self.serial.in_waiting:
+                    self.serial.reset_input_buffer()
+
+                # Формируем команду: DCON любит \r
+                cmd_bytes = (command + "\r").encode()  # ← только \r!
+                self.serial.write(cmd_bytes)
+                self.serial.flush()  # 🔥 КРИТИЧНО: дождаться отправки
+
+                # Чтение: читаем БЫСТРО и ВСЁ
+                start_time = time.time()
+                buffer = b''
+                while (time.time() - start_time) < self.timeout:
+                    if self.serial.in_waiting:
+                        # Читаем ВСЁ, что доступно
+                        chunk = self.serial.read(self.serial.in_waiting)
+                        buffer += chunk
+                        # Проверяем конец: \r или \n
+                        if b'\r' in chunk or b'\n' in chunk or len(buffer) > 100:
+                            break
+                    else:
+                        time.sleep(0.001)  # Лёгкая задержка
+                else:
+                    hardware_logger.warning(f"Timeout: {command}")
+                    return None
+
+                # Декодируем
+                response = buffer.decode('utf-8', errors='ignore').strip()
+                #hardware_logger.info(f"DCON: {command} → {response!r}")
+
+                # Валидация
+                if _is_valid_response(command, response):
+                    self.stats["good_responses"] += 1
+                    return response
+                else:
+                    self.stats["bad_responses"] += 1
+                    if self.serial.in_waiting:
+                        self.serial.reset_input_buffer()
+                    time.sleep(0.02)
+                    return None
+
+            else:
+                return _simulate_response(command)
+
+        except Exception as e:
+            hardware_logger.error(f"Ошибка отправки '{command}': {e}")
             return None
 
     def read_ai(self, module_id: str) -> List[str]:

@@ -1,339 +1,383 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>🏭 АПАТЕК — Панель управления</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #121212;
-            color: #e0e0e0;
-            font-size: 13px;
-            overflow: hidden;
-        }
-        .container {
-            padding: 10px;
-        }
-        .header-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 0 10px;
-            border-bottom: 1px solid #333;
-            margin-bottom: 12px;
-        }
-        .nav-buttons {
-        display: flex;
-        gap: 8px;
-        margin-right: 12px;
-        }
+  <meta charset="UTF-8" />
+  <title>🏭 АПАТЕК — Панель управления</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    /* Гибкие размеры шрифтов */
+    :root {
+      font-size: clamp(12px, 2.5vw, 16px);
+    }
 
-        .btn-nav {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: #2a2a2a;
-            color: #e0e0e0;
-            border: 1px solid #555;
-            border-radius: 6px;
-            padding: 4px 10px;
-            font-size: 12px;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            min-width: 90px;
-            text-align: center;
-        }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-        .btn-nav:hover {
-            background: #3a3a3a;
-            color: #ffffff;
-            box-shadow: 0 0 6px rgba(100, 181, 246, 0.3);
-        }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #121212;
+      color: #e0e0e0;
+      line-height: 1.4;
+    }
 
-        .btn-nav:active {
-            transform: translateY(1px);
-        }
-        .header-bar h1 {
-            font-size: 16px;
-            font-weight: 600;
-        }
-        .header-bar span {
-            font-size: 12px;
-            color: #bbb;
-        }
+    .container {
+      padding: 10px;
+    }
 
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            height: calc(100vh - 70px);
-            gap: 12px;
-        }
-        .press {
-            background: #1e1e1e;
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 10px;
-            display: flex;
-            flex-direction: column;
-            font-size: 13px;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 6px;
-            font-size: 14px;
-            font-weight: 600;
-        }
-        .status {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 500;
-        }
-        .running { background: #43a047; color: white; }
-        .stopped { background: #e53935; color: white; }
-        .paused { background: #fb8c00; color: white; }
+    .header-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0 10px;
+      border-bottom: 1px solid #333;
+      margin-bottom: 12px;
+    }
 
-        .temps {
-            font-family: 'Courier New', monospace;
-            font-size: 15px;
-            text-align: center;
-            margin: 4px 0;
-            color: #64b5f6;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+    .header-bar h1 {
+      font-size: 1.2em;
+      font-weight: 600;
+    }
 
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 2px 0;
-            font-size: 11.5px;
-            color: #bbb;
-        }
+    .header-bar span {
+      font-size: 0.9em;
+      color: #bbb;
+    }
 
-        /* Зоны нагрева — 7 зон, 4 + 3 */
-        .zones {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            margin: 6px 0;
-            justify-content: center;
-        }
-        .zone {
-            text-align: center;
-            width: 26px;
-            font-size: 11px;
-        }
-        .lamp {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            margin: 0 auto 2px;
-            border: 1px solid #555;
-        }
-        .lamp.on { background: #f44336; box-shadow: 0 0 6px #d32f2f; }
-        .lamp.off { background: #424242; }
+    .nav-buttons {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
 
-        /* Блоки с лампами (входы/выходы) — 4 в ряд */
-        .io-section {
-            margin-top: 6px;
-            border-top: 1px solid #333;
-            padding-top: 5px;
-        }
-        .io-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 6px;
-        }
-        .io-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            font-size: 10.5px;
-            text-align: center;
-        }
-        .io-label {
-            margin-top: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 50px;
-        }
-    </style>
+    .btn-nav {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #2a2a2a;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.9em;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      min-width: 75px;
+    }
+
+    .btn-nav:hover {
+      background: #3a3a3a;
+      color: #ffffff;
+      box-shadow: 0 0 6px rgba(100, 181, 246, 0.3);
+    }
+
+    .btn-nav:active {
+      transform: translateY(1px);
+    }
+
+    /* Гибкая сетка: от 300px до 1fr */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 14px;
+      height: calc(100vh - 70px);
+      overflow-y: auto;
+      padding: 0 4px;
+    }
+
+    .press {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      font-size: 1em;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 1.1em;
+      font-weight: 600;
+    }
+
+    .status {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.9em;
+      font-weight: 500;
+    }
+
+    .running { background: #43a047; color: white; }
+    .stopped { background: #e53935; color: white; }
+    .paused { background: #fb8c00; color: white; }
+
+    /* Температуры и зоны — вместе, по центру, в одну строку */
+    .temp-zone-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 6px 0;
+      gap: 4px;
+    }
+
+    .temps {
+      font-family: 'Courier New', monospace;
+      font-size: 1.1em;
+      text-align: center;
+      color: #64b5f6;
+      font-weight: 500;
+      letter-spacing: -0.6px;
+      width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .zones {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 6px 0 2px;
+      padding: 0 8px;
+    }
+
+    .zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 0.9em;
+      min-width: 26px;
+    }
+
+    .lamp {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      margin: 0 auto 1px;
+      border: 1px solid #555;
+    }
+
+    .lamp.on {
+      background: #f44336;
+      box-shadow: 0 0 8px #d32f2f;
+      transform: scale(1.1);
+      }
+    .lamp.off { background: #424242; box-shadow: 0 0 2px rgba(255, 255, 255, 0.05) }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 2px 0;
+      font-size: 0.9em;
+      color: #bbb;
+    }
+
+    /* Входы/выходы — 5 колонок */
+    .io-section {
+      margin-top: 6px;
+      border-top: 1px solid #333;
+      padding-top: 5px;
+    }
+
+    .io-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+    }
+
+    .io-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 0.9em;
+      text-align: center;
+    }
+
+    .io-label {
+      margin-top: 2px;
+      font-size: 0.85em;
+      white-space: normal;     /* Разреши перенос */
+      overflow: visible;
+      text-overflow: clip;
+      max-width: 56px;
+      min-height: 1.2em;
+      line-height: 1.1;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header-bar">
-    <h1>🏭 АПАТЕК — Панель управления</h1>
-
-    <div class="nav-buttons">
-        <a href="{{ url_for('graphs') }}" class="btn-nav">
-            <span>📈 Графики</span>
-        </a>
-        <a href="{{ url_for('edit_program') }}" class="btn-nav">
-            <span>🛠️ Редактор</span>
-        </a>
-        <a href="/pid_tune" class="btn-nav">
-            <span>🔧 ПИД-настройка</span>
-        </a>
+  <div class="container">
+    <div class="header-bar">
+      <h1>🏭 АПАТЕК — Панель управления</h1>
+      <span><strong>Время:</strong> <span id="ts">-</span></span>
+      <div class="nav-buttons">
+        <a href="{{ url_for('graphs') }}" class="btn-nav"><span>📈 Графики</span></a>
+        <a href="{{ url_for('edit_program') }}" class="btn-nav"><span>🛠️ Редактор</span></a>
+        <a href="/pid_tune" class="btn-nav"><span>🔧 ПИД</span></a>
+      </div>
     </div>
 
-    <span><strong>Время:</strong> <span id="ts">-</span></span>
-</div>
-
-        <div id="data">
-            <p style="color: #888; text-align: center;">Загрузка...</p>
-        </div>
+    <div id="data">
+      <p style="color: #888; text-align: center;">Загрузка...</p>
     </div>
+  </div>
 
-    <script>
-        const dataDiv = document.getElementById('data');
-        const tsSpan = document.getElementById('ts');
+  <script>
+    const dataDiv = document.getElementById('data');
+    const tsSpan = document.getElementById('ts');
 
-        const eventSource = new EventSource('/stream');
+    const stepLabels = {
+      'ramp_temp': 'Нагрев',
+      'hold': 'Выдержка',
+      'cool': 'Охлаждение',
+      'ramp_pressure': 'Давление',
+      'lift_to_limit': 'Подъём',
+      'open_mold': 'Открыть форму',
+      'pause': 'Пауза',
+      'set_pressure': 'Уст. давления'
+    };
 
-        const stepLabels = {
-            'ramp_temp': 'Нагрев',
-            'hold': 'Выдержка',
-            'cool': 'Охлаждение',
-            'ramp_pressure': 'Давление',
-            'lift_to_limit': 'Подъём',
-            'open_mold': 'Открыть форму',
-            'pause': 'Пауза',
-            'set_pressure': 'Уст. давления'
-        };
+    const outputLabels = {
+      'lamp_run': 'Запуск',
+      'lamp_pause': 'Пауза',
+      'lamp_preheat': 'Прогрев',
+      'lamp_auto_heat': 'Авт. нагрев',
+      'lamp_pressure': 'Давление'
+    };
 
-        const outputLabels = {
-            'lamp_run': 'Запуск',
-            'lamp_pause': 'Пауза',
-            'lamp_preheat': 'Прогрев',
-            'lamp_auto_heat': 'Авт. нагрев',
-            'lamp_pressure': 'Давление'
-        };
+    const inputLabels = {
+      'start_btn': 'Старт',
+      'stop_btn': 'Стоп',
+      'pause_btn': 'Пауза',
+      'preheat_btn': 'Прогрев',
+      'limit_switch': 'Лимит'
+    };
 
-        const inputLabels = {
-            'start_btn': 'Старт',
-            'stop_btn': 'Стоп',
-            'pause_btn': 'Пауза',
-            'preheat_btn': 'Прогрев',
-            'limit_switch': 'Лимит'
-        };
+    const eventSource = new EventSource('/stream');
 
-        eventSource.onmessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
-                if (tsSpan) tsSpan.textContent = data.timestamp;
+    eventSource.onmessage = function(event) {
+      try {
+        const data = JSON.parse(event.data);
+        if (tsSpan) tsSpan.textContent = data.timestamp;
 
-                let html = '';
-                for (const p of data.presses) {
-                    const tempTarget = p.temp_target !== null ? p.temp_target.toFixed(1) : 'N/A';
-                    const pressure = p.pressure !== null ? p.pressure.toFixed(1) : 'N/A';
-                    const pressureTarget = p.pressure_target !== null ? p.pressure_target.toFixed(1) : 'N/A';
+        let html = '';
+        for (const p of data.presses) {
+          const tempTarget = p.temp_target !== null ? p.temp_target.toFixed(1) : 'N/A';
+          const pressure = p.pressure !== null ? p.pressure.toFixed(1) : 'N/A';
+          const pressureTarget = p.pressure_target !== null ? p.pressure_target.toFixed(1) : 'N/A';
 
-                    let statusClass, statusText;
-                    if (!p.running) {
-                        statusClass = "stopped";
-                        statusText = "О";
-                    } else if (p.current_step.status === "paused") {
-                        statusClass = "paused";
-                        statusText = "П";
-                    } else {
-                        statusClass = "running";
-                        statusText = "Р";
-                    }
+          let statusClass, statusText;
+          if (!p.running) {
+            statusClass = "stopped";
+            statusText = "О";
+          } else if (p.current_step.status === "paused") {
+            statusClass = "paused";
+            statusText = "П";
+          } else {
+            statusClass = "running";
+            statusText = "Р";
+          }
 
-                    const index = typeof p.current_step.index === 'number' ? p.current_step.index + 1 : '–';
-                    const type = stepLabels[p.current_step.type] || p.current_step.type;
-                    const elapsed = p.current_step.elapsed || 0;
-                    const duration = p.current_step.duration === "∞" || p.current_step.duration == null ? "∞" : p.current_step.duration;
+          const index = typeof p.current_step.index === 'number' ? p.current_step.index + 1 : '–';
+          const type = stepLabels[p.current_step.type] || p.current_step.type;
+          const elapsed = p.current_step.elapsed || 0;
+          const duration = p.current_step.duration === "∞" || p.current_step.duration == null ? "∞" : p.current_step.duration;
 
-                    html += `
-                    <div class="press">
-                        <div class="header">
-                            <span>Пресс ${p.id}</span>
-                            <span class="status ${statusClass}">${statusText}</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Шаг: ${index}. ${type}</span>
-                            <span>${elapsed}/${duration} с</span>
-                        </div>
-                        <div class="info-row">
-                            <span>Статус: ${p.current_step.status}</span>
-                        </div>
+          html += `
+          <div class="press">
+            <div class="header">
+              <span>Пресс ${p.id}</span>
+              <span class="status ${statusClass}">${statusText}</span>
+            </div>
 
-                        <div class="temps">
-                            ${p.temps.slice(0,7).map(t => t !== null ? t.toFixed(1) : 'N/A').join(' | ')}
-                        </div>
+            <!-- Температуры и зоны — вместе, по центру -->
+            <div class="temp-zone-container">
+              <div class="temps">
+                ${p.temps.slice(0,7).map(t => t !== null ? t.toFixed(1) : 'N/A').join(' | ')}
+              </div>
+              <div class="zones">
+                ${p.heating_bits.slice(0,7).map((on, i) => `
+                  <div class="zone">
+                    <div class="lamp ${on ? 'on' : 'off'}"></div>
+                    <div>${i+1}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
 
-                        <div class="info-row">
-                            <span>Уст: ${tempTarget}°C</span>
-                            <span>Давл: ${pressure} / ${pressureTarget} МПа</span>
-                        </div>
+            <!-- Основная информация -->
+            <div class="info-row">
+              <span>Шаг: ${index}. ${type}</span>
+              <span>${elapsed}/${duration} с</span>
+            </div>
+            <div class="info-row">
+              <span>Статус: ${p.current_step.status}</span>
+            </div>
+            <div class="info-row">
+              <span>Уст: ${tempTarget}°C</span>
+              <span>Давл: ${pressure}/${pressureTarget} МПа</span>
+            </div>
 
-                        <!-- Зоны нагрева -->
-                        <div class="zones">
-                            ${p.heating_bits.slice(0,7).map((on, i) => `
-                                <div class="zone">
-                                    <div class="lamp ${on ? 'on' : 'off'}"></div>
-                                    <div>${i+1}</div>
-                                </div>
-                            `).join('')}
-                        </div>
+            <!-- Входы -->
+            <div class="io-section">
+              <div class="io-grid">
+                ${p.inputs.map(item => `
+                  <div class="io-item">
+                    <div class="lamp ${item.on ? 'on' : 'off'}"></div>
+                    <span class="io-label">${inputLabels[item.name] || item.name}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
 
-                        <!-- Кнопки (входы) -->
-                        <div class="io-section">
-                            <div class="io-grid">
-                                ${p.inputs.map(item => `
-                                    <div class="io-item">
-                                        <div class="lamp ${item.on ? 'on' : 'off'}"></div>
-                                        <span class="io-label">${inputLabels[item.name] || item.name}</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
+            <!-- Выходы -->
+            <div class="io-section">
+              <div class="io-grid">
+                ${p.outputs.map(item => `
+                  <div class="io-item">
+                    <div class="lamp ${item.on ? 'on' : 'off'}"></div>
+                    <span class="io-label">${outputLabels[item.name] || item.name}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
 
-                        <!-- Лампы (выходы) -->
-                        <div class="io-section">
-                            <div class="io-grid">
-                                ${p.outputs.map(item => `
-                                    <div class="io-item">
-                                        <div class="lamp ${item.on ? 'on' : 'off'}"></div>
-                                        <span class="io-label">${outputLabels[item.name] || item.name}</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
+            <!-- Клапаны -->
+            <div class="io-section">
+              <div class="io-grid">
+                ${p.valve_outputs.map(item => `
+                  <div class="io-item">
+                    <div class="lamp ${item.on ? 'on' : 'off'}"></div>
+                    <span class="io-label">${item.label}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>`;
+        }
 
-                    <!-- Клапаны -->
-                    <div class="io-section">
-                        <div class="io-grid">
-                            ${p.valve_outputs.map(item => `
-                                <div class="io-item">
-                                    <div class="lamp ${item.on ? 'on' : 'off'}"></div>
-                                    <span class="label">${item.label}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    </div>`;
-                }
+        // Оберни всё в .grid
+        if (dataDiv) {
+          dataDiv.innerHTML = `<div class="grid">${html}</div>`;
+        }
+      } catch (e) {
+        console.error("Ошибка:", e);
+        if (dataDiv) dataDiv.innerHTML = '<p style="color:red">⚠️ Ошибка</p>';
+      }
+    };
 
-                if (dataDiv) dataDiv.innerHTML = html;
-            } catch (e) {
-                console.error("Ошибка:", e);
-                if (dataDiv) dataDiv.innerHTML = '<p style="color:red">⚠️ Ошибка</p>';
-            }
-        };
-
-        eventSource.onerror = function(e) {
-            console.error("SSE ошибка:", e);
-        };
-    </script>
+    eventSource.onerror = function(e) {
+      console.error("SSE ошибка:", e);
+    };
+  </script>
 </body>
 </html>

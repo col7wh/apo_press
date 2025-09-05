@@ -4,6 +4,7 @@ import time
 import json
 import os
 
+
 try:
     with open('config/config.json', 'r', encoding='utf-8') as f:
         config = json.load(f)
@@ -53,7 +54,7 @@ def handle_client(ser: serial.Serial):
             start_time = time.time()
             while time.time() - start_time < 0.5 and ser.in_waiting > 0:
                 char = ser.read(1).decode('ascii', errors='ignore')
-                if char in '\r\n':
+                if char in '\r':
                     break
                 buffer += char
             line = buffer.strip()
@@ -81,9 +82,9 @@ def handle_client(ser: serial.Serial):
                     "I-7051": "7051"
                 }.get(devices[addr]["model"], "XXXX")
 
-                response = f"!{line[1:3]}{model_code}\r\n"
+                response = f"!{line[1:3]}{model_code}\r"
                 ser.write(response.encode())
-                #print(f"[SIMULATOR] Получено: {repr(line)} Отправлено: {repr(response.strip())}", flush=True)
+                # print(f"[SIMULATOR] Получено: {repr(line)} Отправлено: {repr(response.strip())}", flush=True)
 
             # === 2. #310001 — запись младшего байта ===
             elif line.startswith("#") and len(line) == 7:
@@ -110,21 +111,21 @@ def handle_client(ser: serial.Serial):
                     # Запись в младший байт
                     new_do = high_byte + data.upper()
                     device["do"] = new_do
-                    #print(f"[SIMULATOR] DO #{addr} младший байт: {low_byte} → {data.upper()} (now {new_do})",flush=True)
+                    # print(f"[SIMULATOR] DO #{addr} младший байт: {low_byte} → {data.upper()} (now {new_do})",flush=True)
 
                 elif cmd == "0B":
                     # Запись в старший байт
                     new_do = data.upper() + low_byte
                     device["do"] = new_do
-                    #print(f"[SIMULATOR] DO #{addr} старший байт: {high_byte} → {data.upper()} (now {new_do})",flush=True)
+                    # print(f"[SIMULATOR] DO #{addr} старший байт: {high_byte} → {data.upper()} (now {new_do})",flush=True)
 
 
                 else:
                     continue
                 devices[addr]['di'] = new_do
                 # Подтверждение записи — просто >
-                ser.write(b">\r\n")
-                print(f"[SIMULATOR] Получено: {repr(line)} Отправлено: '>' {new_do} | {devices[addr]['di']}", flush=True)
+                ser.write(b">\r")
+                # print(f"[SIMULATOR] Получено: {repr(line)} Отправлено: '>' {new_do} | {devices[addr]['di']}", flush=True)
 
             # === 3. #31 — чтение DO ===
             elif line.startswith("#") and len(line) != 7:
@@ -141,13 +142,13 @@ def handle_client(ser: serial.Serial):
                 if device["model"] == "I-7045":
                     # Возвращаем текущее состояние DO
                     # response = f">{device['do']}\r\n"
-                    response = f">\r\n"
+                    response = f">\r"
                 elif device["model"] in ("I-7017", "I-7018"):
                     response = ">" + "".join(f"{val:+07.3f}" for val in device["ai"])
 
                 if response:
-                    ser.write((response + "\r\n").encode())
-                    #print(f"[SIMULATOR] Получено: {repr(line)} Отправлено: {repr(response)}", flush=True)
+                    ser.write((response + "\r").encode())
+                    # print(f"[SIMULATOR] Получено: {repr(line)} Отправлено: {repr(response)}", flush=True)
 
             # === 4. @31 — чтение DI ===
             elif line.startswith("@") and len(line) == 3:
@@ -161,10 +162,10 @@ def handle_client(ser: serial.Serial):
 
                 device = devices[addr]
                 if "di" in device:
-                    response = f">{device['di'].upper()}\r\n"
+                    response = f">{device['di'].upper()}\r"
                     ser.write(response.encode())
-                    if device["model"] == "I-7045":
-                        print(f"[SIMULATOR] Получено: {repr(line)} Отправлено: {repr(response.strip())}", flush=True)
+                    # if device["model"] == "I-7045":
+                    # print(f"[SIMULATOR] Получено: {repr(line)} Отправлено: {repr(response.strip())}", flush=True)
 
             # === 5. Эмуляция реакции на DO (например, давление растёт) ===
             current_time = time.time()
@@ -191,8 +192,8 @@ def start_simulator():
     os.makedirs(DATA_DIR, exist_ok=True)
     try:
         ser = serial.Serial(COM_PORT, BAUDRATE, timeout=1)
-        print(f"[SIMULATOR] Запущен на {ser.port}")
         handle_client(ser)
+
     except Exception as e:
         print(f"[SIMULATOR] Не удалось открыть {COM_PORT}: {e}")
 
