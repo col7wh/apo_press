@@ -55,6 +55,7 @@ class ControlManager(Thread):
             state.safety_monitors = {}
         state.safety_monitors[press_id] = self.safety
 
+        self._last_di_state = {}  # { (module, bit): True/False }
         self.press_controller = None  # Будет создан при старте
         press_controller = PressController(press_id, config)
         self.pressure_controller = PressureController(press_id)
@@ -100,15 +101,21 @@ class ControlManager(Thread):
 
     def _on_start_pressed(self):
         if self.press_controller and self.press_controller.running:
-            self.logger.info(f"CM Пресс-{self.press_id}: уже запущен")
+            self.logger.info(f"CM Пресс-{self.press_id}: start_btn нажата, но программа уже запущена")
             return
 
-        # Создаём и запускаем
-        self.press_controller = PressController(press_id=self.press_id, config=self.config)
-        self.press_controller.start()
-        self.logger.info(f"CM Пресс-{self.press_id}: программа запущена")
+        # Запускаем PressController
+        try:
+            self.press_controller = PressController(press_id=self.press_id, config=self.config)
+            self.press_controller.start()
+            self.logger.info(f"CM Пресс-{self.press_id}: программа запущена по кнопке")
+        except Exception as e:
+            self.logger.error(f"CM Пресс-{self.press_id}: ошибка запуска программы: {e}")
 
     def _on_stop_pressed(self):
+        # Устанавливаем уставку
+        state.set(f"press_{self.press_id}_target_temp", None)
+
         if self.press_controller and self.press_controller.running:
             self.press_controller.stop()
             self.logger.info(f"CM Пресс-{self.press_id}: останов по кнопке")
@@ -116,13 +123,15 @@ class ControlManager(Thread):
             self.logger.info(f"CM Пресс-{self.press_id}: не запущен")
 
     def _on_pause_pressed(self):
-        if self.press_controller and self.press_controller.running:
-            if self.press_controller.paused:
-                self.press_controller.resume()
-                self.logger.info(f"CM Пресс-{self.press_id}: возобновлён")
-            else:
-                self.press_controller.pause()
-                self.logger.info(f"CM Пресс-{self.press_id}: на паузе")
+        if not (self.press_controller and self.press_controller.running):
+            return
+
+        if self.press_controller.paused:
+            self.press_controller.resume()
+            self.logger.info(f"CM Пресс-{self.press_id}: возобновление после паузы")
+        else:
+            self.press_controller.pause()
+            self.logger.info(f"CM Пресс-{self.press_id}: поставлен на паузу")
 
     def run(self):
         self.logger.info(f"CM Пресс-{self.press_id} ControlManager запущен")
@@ -195,8 +204,6 @@ class ControlManager(Thread):
                 state_val |= (1 << bit)
         return state_val
 
-    # core/control_manager.py
-
     def _write_lamp_bit(self, name: str, on: bool):
         """
         Устанавливает состояние лампы по имени из config.
@@ -260,7 +267,7 @@ class ControlManager(Thread):
             if di2_value is not None:
                 self._handle_safety(di2_value)
 
-    def _handle_buttons(self, value: int):
+    def _handle_buttons_(self, value: int):
         """Обработка кнопок на DI-модуле (например, 37)"""
         for name, cfg in self.btn_config.items():
             try:
@@ -300,12 +307,67 @@ class ControlManager(Thread):
             except Exception as e:
                 self.logger.error(f"CM Ошибка обработки кнопки {name}: {e}")
 
+    def _handle_buttons(self, value: int):
+        """Обработка кнопок по фронту"""
+        for name, cfg in self.btn_config.items():
+            try:
+                module = cfg["module"]
+                bit = cfg["bit"]
+                btn_type = cfg.get("type", "active_high")
+
+                if module != str(self.di_module):
+                    continue
+
+                # Читаем текущее состояние бита
+                bit_set = bool(value & (1 << bit))
+
+                # Учитываем тип сигнала
+                if btn_type == "active_low":
+                    current = not bit_set
+                else:
+                    current = bit_set
+
+                # Получаем предыдущее состояние
+                key = (module, bit)
+                previous = self._last_di_state.get(key, None)
+
+                # Сохраняем текущее состояние
+                self._last_di_state[key] = current
+
+                # Пропускаем, если это первый опрос
+                if previous is None:
+                    continue
+
+                # Срабатывание по фронту: с 0 → 1
+                if not previous and current:
+                    self._on_button_pressed(name)
+
+            except Exception as e:
+                self.logger.error(f"CM Ошибка обработки кнопки {name}: {e}")
+
+    def _on_button_pressed(self, name: str):
+        """Единая точка обработки нажатий"""
+        if name == "start_btn":
+            self._on_start_pressed()
+        elif name == "stop_btn":
+            self._on_stop_pressed()
+        elif name == "pause_btn":
+            self._on_pause_pressed()
+        elif name == "preheat_btn":
+            self._on_preheat_pressed()
+        elif name == "limit_switch":
+            self._on_limit_switch_reached()
+        else:
+            self.logger.debug(f"CM Кнопка {name} нажата")
+
     def _handle_safety(self, value: int):
         # Передаётся в SafetyMonitor
         pass
 
     def _is_preheat_active(self) -> bool:
-        return False
+        target_temp = state.get(f"press_{self.press_id}_target_temp", None)
+
+        return target_temp is not None
 
     def _ensure_all_off(self):
 
@@ -315,30 +377,6 @@ class ControlManager(Thread):
         for mid in modules:
             state.set_do_command(mid, 0, 0, urgent=True)
 
-    def _on_start_pressed(self):
-        if self.press_controller and self.press_controller.running:
-            self.logger.info(f"CM Пресс-{self.press_id}: start_btn нажата, но программа уже запущена")
-            return
-
-        # Запускаем PressController
-        try:
-            self.press_controller = PressController(press_id=self.press_id, config=self.config)
-            self.press_controller.start()
-            self.logger.info(f"CM Пресс-{self.press_id}: программа запущена по кнопке")
-        except Exception as e:
-            self.logger.error(f"CM Пресс-{self.press_id}: ошибка запуска программы: {e}")
-
-    def _on_pause_pressed(self):
-        if not (self.press_controller and self.press_controller.running):
-            return
-
-        if self.press_controller.paused:
-            self.press_controller.resume()
-            self.logger.info(f"CM Пресс-{self.press_id}: возобновление после паузы")
-        else:
-            self.press_controller.pause()
-            self.logger.info(f"CM Пресс-{self.press_id}: поставлен на паузу")
-
     def _on_preheat_pressed(self):
         # Читаем уставку из первого шага программы
         program_path = f"programs/press{self.press_id}.json"
@@ -347,6 +385,7 @@ class ControlManager(Thread):
                 program = json.load(f)
             first_step = program.get("temp_program", [{}])[0]
             target_temp = first_step.get("target_temp", 50.0)
+
 
             # Устанавливаем уставку
             state.set(f"press_{self.press_id}_target_temp", target_temp)
@@ -360,13 +399,6 @@ class ControlManager(Thread):
         # Например, завершить шаг "lift_to_limit"
         state.set(f"press_{self.press_id}_limit_reached", True)
         self.logger.debug(f"CM Пресс-{self.press_id}: достигнут лимит")
-
-    def _on_stop_pressed(self):
-        if not (self.press_controller and self.press_controller.running):
-            return
-
-        self.press_controller.stop()
-        self.logger.info(f"CM Пресс-{self.press_id}: останов по кнопке")
 
     def stop(self):
         self.temp_controller.stop()

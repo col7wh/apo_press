@@ -7,6 +7,8 @@ import threading
 import os
 import atexit
 from typing import Dict, Any
+
+from core.graph_transmitter import GraphTransmitter
 from core.hardware_interface import HardwareInterface
 from core.hardware_daemon import HardwareDaemon
 from core.web_interface import WebInterface
@@ -362,6 +364,11 @@ def main():
     web_ui = WebInterface(host="0.0.0.0", port=5000)
     web_ui.start()
     logging.info("M Веб-интерфейс запущен (http://localhost:5000)")
+
+    # Запуск передатчика на график
+    graph_tx = GraphTransmitter()
+    graph_tx.start()
+
 
     try:
         while running:

@@ -92,13 +92,13 @@ class TemperatureController(threading.Thread):
         """Чтение всех 8 температур из global_state (шины)"""
         try:
             temps = state.read_ai(self.press_id)  # ✅ Читаем через шину
-            if not temps or len(temps) < 8:
+            if not temps or len(temps) < 7:
                 logging.warning(f"TC Пресс-{self.press_id}: недостаточно данных температур")
-                return [None] * 8
+                return [None] * 7
             return temps
         except Exception as e:
             logging.error(f"TC Пресс-{self.press_id}: ошибка чтения температур: {e}")
-            return [None] * 8
+            return [None] * 7
 
     def _update_do_output(self):
         """Обновляет DO, включая/выключая нужные каналы"""
@@ -185,8 +185,9 @@ class TemperatureController(threading.Thread):
             if current_state != new_state:
                 low = new_state & 0xFF
                 high = (new_state >> 8) & 0xFF
-                state.set_do_command(self.do_module, low, high, urgent=False)
+                state.set_do_command(self.do_module, low, high, urgent=True)
                 logging.info(f"TC Пресс-{self.press_id}: нагрев выключен (target_temp = None)")
+                logging.debug(f"TC Command{self.do_module, low, high}")
             return
 
         temps = self.read_all_temperatures()
@@ -259,9 +260,7 @@ if __name__ == "__main__":
     choice = input("> ").strip()
 
     if choice == "1":
-        from core.mock_hardware import MockHardwareInterface
-        hw = MockHardwareInterface()
-        print("✅ Мок-режим активирован")
+        print("✅ Мок-режим активирован ----")
     elif choice == "2":
         from core.hardware_interface import HardwareInterface
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -63,7 +63,7 @@ def keyboard_listener():
     print("  E           — Аварийный останов (E-Stop)")
     print("  D           — Дверь (открыта/закрыта)")
     print("  C           — Форма (закрыта/открыта)")
-    print("  L           — Лимит подъёма")
+    print("  L123        — Лимит подъёма")
     print("  ?           — Показать меню")
     print("  Q           — Выход")
     print("="*60 + "\n")
@@ -249,15 +249,65 @@ def handle_client(ser: serial.Serial):
                     status = "форма закрыта" if current & (1<<bit) else "форма открыта"
                     print(f"✅ [SIM] Форма: {status} | DI-{module} = {current:04X}")
 
+                elif key == 'j':
+                    press_id = 1
+                    module = int(hw_config["presses"][press_id - 1]["control_inputs"]["limit_switch"]["module"])
+                    bit = hw_config["presses"][press_id - 1]["control_inputs"]["limit_switch"]["bit"]
+                    current = int(devices[module].get("di", "0000"), 16)
+                    current ^= (1 << bit)
+                    devices[module]["di"] = f"{current:04X}"
+                    status = "достигнут" if current & (1 << bit) else "не достигнут"
+                    print(f"✅ [SIM] Лимит-{press_id}: {status} | DI-{module} = {current:04X}")
+
+                elif key == 'k':
+                    press_id = 2
+                    module = int(hw_config["presses"][press_id - 1]["control_inputs"]["limit_switch"]["module"])
+                    bit = hw_config["presses"][press_id - 1]["control_inputs"]["limit_switch"]["bit"]
+                    current = int(devices[module].get("di", "0000"), 16)
+                    current ^= (1 << bit)
+                    devices[module]["di"] = f"{current:04X}"
+                    status = "достигнут" if current & (1 << bit) else "не достигнут"
+                    print(f"✅ [SIM] Лимит-{press_id}: {status} | DI-{module} = {current:04X}")
+
                 elif key == 'l':
-                    for pid in [1,2,3]:
-                        module = int(hw_config["presses"][pid-1]["control_inputs"]["limit_switch"]["module"])
-                        bit = hw_config["presses"][pid-1]["control_inputs"]["limit_switch"]["bit"]
-                        current = int(devices[module].get("di", "0000"), 16)
-                        current ^= (1 << bit)
-                        devices[module]["di"] = f"{current:04X}"
-                        status = "достигнут" if current & (1<<bit) else "не достигнут"
-                        print(f"✅ [SIM] Лимит-{pid}: {status}")
+                    press_id = 3
+                    module = int(hw_config["presses"][press_id - 1]["control_inputs"]["limit_switch"]["module"])
+                    bit = hw_config["presses"][press_id - 1]["control_inputs"]["limit_switch"]["bit"]
+                    current = int(devices[module].get("di", "0000"), 16)
+                    current ^= (1 << bit)
+                    devices[module]["di"] = f"{current:04X}"
+                    status = "достигнут" if current & (1 << bit) else "не достигнут"
+                    print(f"✅ [SIM] Лимит-{press_id}: {status} | DI-{module} = {current:04X}")
+
+                elif key == 't':
+                    press_id = 1
+                    module = int(hw_config["presses"][press_id - 1]["control_inputs"]["preheat_btn"]["module"])
+                    bit = hw_config["presses"][press_id - 1]["control_inputs"]["preheat_btn"]["bit"]
+                    current = int(devices[module].get("di", "0000"), 16)
+                    current ^= (1 << bit)
+                    devices[module]["di"] = f"{current:04X}"
+                    status = "нажата" if current & (1 << bit) else "отпущена"
+                    print(f"✅ [SIM] Прогрев-{press_id}: {status} | DI-{module} = {current:04X}")
+
+                elif key == 'y':
+                    press_id = 2
+                    module = int(hw_config["presses"][press_id - 1]["control_inputs"]["preheat_btn"]["module"])
+                    bit = hw_config["presses"][press_id - 1]["control_inputs"]["preheat_btn"]["bit"]
+                    current = int(devices[module].get("di", "0000"), 16)
+                    current ^= (1 << bit)
+                    devices[module]["di"] = f"{current:04X}"
+                    status = "нажата" if current & (1 << bit) else "отпущена"
+                    print(f"✅ [SIM] Прогрев-{press_id}: {status} | DI-{module} = {current:04X}")
+
+                elif key == 'u':
+                    press_id = 3
+                    module = int(hw_config["presses"][press_id - 1]["control_inputs"]["preheat_btn"]["module"])
+                    bit = hw_config["presses"][press_id - 1]["control_inputs"]["preheat_btn"]["bit"]
+                    current = int(devices[module].get("di", "0000"), 16)
+                    current ^= (1 << bit)
+                    devices[module]["di"] = f"{current:04X}"
+                    status = "нажата" if current & (1 << bit) else "отпущена"
+                    print(f"✅ [SIM] Прогрев-{press_id}: {status} | DI-{module} = {current:04X}")
 
                 elif key == '?':
                     print("\n" + "="*50)
