@@ -3,6 +3,7 @@ import json
 import logging
 import time
 import os
+import traceback
 from logging.handlers import TimedRotatingFileHandler
 from threading import Thread
 from core.global_state import state
@@ -42,7 +43,18 @@ class ControlManager(Thread):
             self.heating_do_module = press_cfg["modules"]["do"]
 
             self.btn_config = press_cfg.get("control_inputs", {})
-            self.lamp_config = press_cfg.get("status_outputs", {})
+            # self.lamp_config = press_cfg.get("status_outputs", {})
+            # Объединяем status_outputs и valves в lamp_config
+            self.lamp_config = press_cfg.get("status_outputs", {}).copy()
+
+            # Добавляем клапаны как часть lamp_config
+            if "valves" in press_cfg:
+                for name, cfg in press_cfg["valves"].items():
+                    self.lamp_config[name] = {
+                        "module": cfg["module"],
+                        "bit": cfg["bit"]
+                        # Предполагаем active_high, можно добавить type
+                    }
         except Exception as e:
             self.logger.critical(f"CM Пресс-{self.press_id} Ошибка загрузки конфигурации: {e}")
             raise
@@ -64,7 +76,11 @@ class ControlManager(Thread):
             "lamp_run": False,
             "lamp_pause": False,
             "lamp_preheat": False,
-            "heater": False
+            "heater": False,
+            "lift_up": False,
+            "lift_down": False,
+            "open": False,
+            "close": False
         }
 
         # Принудительное выключение при старте
@@ -146,6 +162,8 @@ class ControlManager(Thread):
                 if target_pressure > 0:
                     self.pressure_controller.set_target_pressure(target_pressure)
                     self.pressure_controller.update()
+                else:
+                    self.pressure_controller._stop_all()
 
                 time.sleep(0.1)
 
@@ -158,7 +176,11 @@ class ControlManager(Thread):
             "lamp_run": False,
             "lamp_pause": False,
             "lamp_preheat": False,
-            "heater": False
+            "heater": False,
+            "lift_up": False,
+            "lift_down": False,
+            "open": False,
+            "close": False
         }
 
         if not self.safety.is_safe():
@@ -174,6 +196,18 @@ class ControlManager(Thread):
             self.desired["heater"] = True
             self.desired["lamp_preheat"] = True
 
+        if state.get(f"press_{self.press_id}_valve_lift_up"):
+            self.desired["lift_up"] = True
+
+        if state.get(f"press_{self.press_id}_valve_lift_down"):
+            self.desired["lift_down"] = True
+
+        if state.get(f"press_{self.press_id}_valve_open"):
+            self.desired["open"] = True
+
+        if state.get(f"press_{self.press_id}_valve_close"):
+            self.desired["close"] = True
+
     def _synchronize_outputs(self):
         """Теперь без групповой записи"""
         if not self.safety.is_safe():
@@ -182,18 +216,35 @@ class ControlManager(Thread):
         else:
             self._write_lamp_bit("lamp_error", False)
 
+        # Лампы и клапаны
+        for name in ["lamp_run", "lamp_pause", "lamp_preheat",
+                     "lamp_auto_heat", "lamp_pressure",
+                     "lift_up", "lift_down", "open", "close"]:
+            if name in self.lamp_config:
+                self._write_lamp_bit(name, self.desired.get(name, False))
+
+
         # Пишем только нужные биты
-        self._write_lamp_bit("lamp_run", self.desired.get("lamp_run", False))
-        self._write_lamp_bit("lamp_pause", self.desired.get("lamp_pause", False))
-        self._write_lamp_bit("lamp_preheat", self.desired.get("lamp_preheat", False))
-        self._write_lamp_bit("lamp_auto_heat", self.desired.get("lamp_auto_heat", False))
-        self._write_lamp_bit("lamp_pressure", self.desired.get("lamp_pressure", False))
+        #self._write_lamp_bit("lamp_run", self.desired.get("lamp_run", False))
+        #self._write_lamp_bit("lamp_pause", self.desired.get("lamp_pause", False))
+        #self._write_lamp_bit("lamp_preheat", self.desired.get("lamp_preheat", False))
+        #self._write_lamp_bit("lamp_auto_heat", self.desired.get("lamp_auto_heat", False))
+        #self._write_lamp_bit("lamp_pressure", self.desired.get("lamp_pressure", False))
+
 
         # 3. Доп. клапаны (если нужно — раскомментировать)
         # valve_state = self._get_valve_state()
         # self._ensure_do_state("31", valve_state)
 
+    def set_valve(self, valve_name: str, on: bool):
+        self.logger.warning(f"CM set_valve  ???")
+        if valve_name in self.desired:
+            self.desired[valve_name] = on
+        else:
+            self.logger.warning(f"CM Нет клапана в desired: {valve_name}")
+
     def _get_lamp_state(self) -> int:
+        self.logger.warning(f"CM _get_lamp_state  ???")
         state_val = 0
         # print(self.lamp_config.items())
         for name, cfg in self.lamp_config.items():
@@ -239,7 +290,17 @@ class ControlManager(Thread):
         if current != new_state:
             low = new_state & 0xFF
             high = (new_state >> 8) & 0xFF
+            """" Трассировка
+            if module_id == "31":
+                stack = traceback.extract_stack()
+                filename, line, func, text = stack[-2]
+                print(
+                    f"🔢 SET_DO: DO-{module_id} {low:02X} {high:02X}  press_{self.press_id}| Вызвано из {func} ({filename}:{line})")
+                print(self.desired)
+            """
             state.set_do_command(module_id, low, high, urgent=True)
+            state.set_do_command(module_id, low, high, urgent=True)
+
             # Логирование
             action = "ON" if target_bit else "OFF"
             self.logger.debug(f"CM Пресс-{self.press_id}: DO-{module_id} bit {bit} ({name}) → {action}")
@@ -402,6 +463,7 @@ class ControlManager(Thread):
         self.temp_controller.stop()
         self.temp_controller.join(timeout=1.0)
         self.running = False
+        self.pressure_controller.stop()
         self.logger.info(f"CM Пресс-{self.press_id}  ControlManager остановлен")
 
     def emergency_stop(self):

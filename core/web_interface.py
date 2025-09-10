@@ -233,10 +233,17 @@ class WebInterface(threading.Thread):
                                 "type": f"{temp_step.get('type', '—')} / {press_step.get('type', '—')}",
                                 "target_temp": temp_step.get("target_temp", "—"),
                                 "target_pressure": press_step.get("target_pressure", "—"),
-                                "elapsed": int(time.time() - (temp_step.get("start_time") or press_step.get(
-                                    "start_time") or time.time())),
-                                "status": state.get(f"press_{pid}_step_status_temperature", "stopped")
+                                "elapsed":  int(state.get(f"press_{pid}_cycle_elapsed", 0.0)),
+                                "status": state.get(f"press_{pid}_step_status_temperature", "stopped"),
+                                "step_time_temp": int(state.get(f"press_{pid}_step_elapsed_temperature", 0.0)),
+                                "step_time_press": int(state.get(f"press_{pid}_step_elapsed_pressure", 0.0)),
+                                "cycle_time": int(state.get(f"press_{pid}_cycle_elapsed", 0.0)),
+
+                                "step_duration_temp": state.get(f"press_{pid}_step_duration_temperature", 0),
+                                "step_duration_press": state.get(f"press_{pid}_step_duration_pressure", 0),
                             }
+
+
                             data["presses"].append({
                                 "id": pid,
                                 "temps": [round(float(t), 1) if t not in (None, "N/A") else None for t in temps[:7]],

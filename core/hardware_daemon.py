@@ -197,6 +197,19 @@ class HardwareDaemon(Thread):
                     if self.hw._send_command(f"#{mid}00{low:02X}") and self.hw._send_command(f"#{mid}0B{high:02X}"):
                         full = (high << 8) | low
                         state.set(f"do_state_{mid}", full)
+                        """""    
+                        if mid == "31":
+                            # 🔍 Получаем стек вызова
+                            stack = traceback.extract_stack()
+                            # Берём предпоследний кадр — последний это сам set()
+                            if low != 0 or high != 0 or self.trig:
+                                self.trig = True
+                                filename, line, func, text = stack[-2]
+                                print(f"🟡 HD: {mid} = {high} {low}| Изменено в {func} ({filename}:{line})")
+                            if high == 0 and low == 0:
+                                self.trig = False
+                        """
+
                         del urgent[mid]
                     else:
                         success = False

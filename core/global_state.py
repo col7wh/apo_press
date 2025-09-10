@@ -15,11 +15,12 @@ class GlobalState:
         self._hw = None
         self._daemon_mode = False
         self.safety_monitors = {}
+        self.trig = False
 
     def set_hardware_interface(self, hw, daemon_mode: bool = False):
         """Устанавливает интерфейс (вызывается из HardwareDaemon)"""
         self._hw = hw
-        #print(f"GS Поднят HW daemon_mode = {daemon_mode}")
+        # print(f"GS Поднят HW daemon_mode = {daemon_mode}")
         self._daemon_mode = daemon_mode
 
     def read_ai(self, press_id: int) -> List[Optional[float]]:
@@ -40,15 +41,15 @@ class GlobalState:
             # Если нет DI — пробуем состояние DO (для модулей типа 31, 34)
             do_key = f"do_state_{module_id}"
             value = self._data.get(do_key)
-            #print(f"GS try read_digital {module_id}, cyr val in state {value} | кей {do_key}")
-            #if value !=0: print("="*30)
+            # print(f"GS try read_digital {module_id}, cyr val in state {value} | кей {do_key}")
+            # if value !=0: print("="*30)
             if value is not None:
                 return value
 
             # Для симуляции: возвращаем 0, если ничего нет
             # Можно добавить логирование для отладки
             # logging.debug(f"STATE: Нет данных для {key} или {do_key}")
-            #print(f"GS try read_digital {module_id}, byt not found whis key {do_key}")
+            # print(f"GS try read_digital {module_id}, byt not found whis key {do_key}")
             return 0  # или None — зависит от политики
 
     def write_do(self, module_id: Union[str, int], low_byte: int, high_byte: int):
@@ -60,7 +61,7 @@ class GlobalState:
             urgent[f"{module_id}"] = (low_byte, high_byte)
             self._data["urgent_do"] = urgent
             # Опционально: логирование
-            #print(f"STATE: DO-{module_id} в очередь: {low_byte:02X}, {high_byte:02X}")
+            # print(f"STATE: DO-{module_id} в очередь: {low_byte:02X}, {high_byte:02X}")
 
     def write_do_bit(self, module_id: Union[str, int], channel: int, on: bool):
 
@@ -72,9 +73,9 @@ class GlobalState:
         low = new_state & 0xFF
         high = (new_state >> 8) & 0xFF
 
-        #if on:
-            #print(f"reqest mod {module_id}, ch {channel} on {on}")
-            #print(f"STATE: write_do_bit → module={module_id}, current={current}, new_state={new_state}")  # 🔥 Добавь это
+        # if on:
+        # print(f"reqest mod {module_id}, ch {channel} on {on}")
+        # print(f"STATE: write_do_bit → module={module_id}, current={current}, new_state={new_state}")  # 🔥 Добавь это
         self.write_do(module_id, low, high)
 
     # core/global_state.py
@@ -92,6 +93,14 @@ class GlobalState:
                 commands[module_id] = (low, high)
                 self._data["heating_do_commands"] = commands
 
+        """
+        # 🔍 ЛОГ
+        if module_id == "31":
+            stack = traceback.extract_stack()
+            filename, line, func, text = stack[-2]
+            print(f"🔧 SET_DO: DO-{module_id} {low:02X} {high:02X} ({'URGENT' if urgent else 'HEATING'}) | Вызвано из {func} ({filename}:{line})")
+        """
+
     def get_and_clear_urgent_do(self) -> dict:
         with self._lock:
             commands = self._data.get("urgent_do_commands", {})
@@ -107,13 +116,18 @@ class GlobalState:
     def set(self, key: str, value: Any):
         with self._lock:
             self._data[key] = value
-            if key.startswith("do_state_"):
+            """"
+            if key.startswith("do_state_31"):
                 # 🔍 Получаем стек вызова
                 stack = traceback.extract_stack()
                 # Берём предпоследний кадр — последний это сам set()
-                filename, line, func, text = stack[-2]
-                #print(f"🟡 STATE: {key} = {value} | Изменено в {func} ({filename}:{line})")
-
+                if value != 0 or self.trig:
+                    self.trig = True
+                    filename, line, func, text = stack[-2]
+                    print(f"🟡 STATE: {key} = {value} | Изменено в {func} ({filename}:{line})")
+                if value == 0:
+                    self.trig = False
+                """
     def get(self, key: str, default: Any = None) -> Any:
         with self._lock:
             return self._data.get(key, default)
@@ -160,6 +174,7 @@ class GlobalState:
             stack = traceback.extract_stack()
             filename, line, func, text = stack[-2]
             # print(f"🟢 DO_STATE: {module_id} = {value:04X} | {func} ({filename}:{line})")
+
 
 # Единый экземпляр
 state = GlobalState()

@@ -1,7 +1,7 @@
 {
     "pressure_program": [
         {
-            "hold_time": 300,
+            "hold_time": 15,
             "ramp_time": 1,
             "step": "ramp_pressure",
             "target_pressure": 0
@@ -10,16 +10,16 @@
             "step": "lift_to_limit"
         },
         {
-            "hold_time": 300,
-            "ramp_time": 180,
+            "hold_time": 30,
+            "ramp_time": 1,
             "step": "ramp_pressure",
-            "target_pressure": 5
+            "target_pressure": 50
         },
         {
-            "hold_time": 600,
-            "ramp_time": 120,
+            "hold_time": 100,
+            "ramp_time": 1,
             "step": "ramp_pressure",
-            "target_pressure": 8
+            "target_pressure": 1
         },
         {
             "step": "open_mold"

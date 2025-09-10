@@ -52,22 +52,21 @@ class PressureController:
         """Устанавливает уставку давления"""
         if self.pid:
             self.pid.set_setpoint(pressure)
-            self.logger.info(f"Уставка давления: {pressure} МПа")
 
     def update(self):
         """Вызывается каждую секунду из HardwareDaemon или ControlManager"""
         target = state.get(f"press_{self.press_id}_target_pressure", 0.0)
-        if target <= 0:
+        up = state.get(f"press_{self.press_id}_valve_lift_up", False)
+        dwn = state.get(f"press_{self.press_id}_valve_lift_down", False)
+
+        if target <= 0 or up or dwn:
             self._stop_all()
             return
 
-        pressure = state.get(f"press_{self.press_id}_pressure", None)
-        if pressure is None:
-            return
-
         # Обновляем ПИД
-        output = self.pid.compute(pressure)
+        output = self.pid.compute(target)
         self._apply_output(output)
+        #self.logger.info(f"PCs press_{self.press_id} Уставка давления: {target} МПа, PID {output}, {up}, {dwn}")
 
     def _apply_output(self, output: float):
         """Преобразует выход ПИД в управление клапанами"""
@@ -77,11 +76,11 @@ class PressureController:
             return
 
         if output > 0:
-            self._set_valve("open", True)
-            self._set_valve("close", False)
-        else:
             self._set_valve("open", False)
             self._set_valve("close", True)
+        else:
+            self._set_valve("open", True)
+            self._set_valve("close", False)
 
         self._last_output = output
 
@@ -102,15 +101,17 @@ class PressureController:
         high = (new_state >> 8) & 0xFF
 
         # 🔥 Ставим в срочную очередь
-        state.set_do_command(module, low, high, urgent=True)
-        self.logger.debug(f"Клапан {valve_name} ({module}.{bit}): {'ON' if on else 'OFF'}")
+        # state.set_do_command(module, low, high, urgent=True)
+        # неверно нужно так
+        state.set(f"press_{self.press_id}_valve_{valve_name}", on)
+        #self.logger.info(f"PCs press_{self.press_id} Клапан {valve_name} : {'ON' if on else 'OFF'}")
 
     def _stop_all(self):
         """Останавливает все клапаны"""
-        self._set_valve("open", False)
-        self._set_valve("close", False)
+        state.set(f"press_{self.press_id}_valve_open", False)
+        state.set(f"press_{self.press_id}_valve_close", False)
 
     def stop(self):
         """Остановка регулятора"""
         self._stop_all()
-        self.logger.info("Регулятор давления остановлен")
+        self.logger.info("PCs Регулятор давления остановлен")

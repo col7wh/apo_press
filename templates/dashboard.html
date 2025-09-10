@@ -291,6 +291,10 @@
           const type = stepLabels[p.current_step.type] || p.current_step.type;
           const elapsed = p.current_step.elapsed || 0;
           const duration = p.current_step.duration === "∞" || p.current_step.duration == null ? "∞" : p.current_step.duration;
+          const step_time_temp = p.current_step.step_time_temp || 0;
+          const step_time_press = p.current_step.step_time_press || 0;
+          const step_duration_temp = p.current_step.step_duration_temp || 0;
+          const step_duration_press = p.current_step.step_duration_press || 0;
 
           html += `
           <div class="press">
@@ -317,14 +321,14 @@
             <!-- Основная информация -->
             <div class="info-row">
               <span>Шаг: ${index}. ${type}</span>
-              <span>${elapsed}/${duration} с</span>
+              <span>Время общее ${elapsed}/${duration} с</span>
             </div>
             <div class="info-row">
               <span>Статус: ${p.current_step.status}</span>
             </div>
             <div class="info-row">
-              <span>Уст: ${tempTarget}°C</span>
-              <span>Давл: ${pressure}/${pressureTarget} МПа</span>
+              <span>Темп Уст: ${tempTarget}°C | Время: ${step_time_temp}/${step_duration_temp} с</span>
+              <span>Давл Уст|Изм: ${pressure}/${pressureTarget} МПа | Время: ${step_time_press}/${step_duration_press} с</span>
             </div>
 
             <!-- Входы -->

@@ -36,6 +36,9 @@ class StepEngine:
     def update(self):
         """Вызывается каждый цикл. Выполняет текущий шаг."""
         if not self.active or self.current_step_index >= len(self.program):
+            # ✅ Останавливаем счёт времени, если программа закончилась
+            if state.get(f"press_{self.press_id}_step_running_{self.name}", False):
+                state.set(f"press_{self.press_id}_step_running_{self.name}", False)
             return
 
         step = self.program[self.current_step_index]
@@ -56,6 +59,11 @@ class StepEngine:
             self.step_in_progress = True
             self._on_step_start(step)
 
+        # ✅ Обновляем время шага
+        if self.step_in_progress:
+            elapsed = time.time() - self.start_time
+            state.set(f"press_{self.press_id}_step_elapsed_{self.name}", elapsed)
+
         # Выполнение
         try:
             if self._execute_step(step):
@@ -68,17 +76,39 @@ class StepEngine:
 
     def _on_step_start(self, step: Dict):
         """Вызывается при старте шага"""
+        self.start_time = time.time()
+        self.step_in_progress = True
+
+        # Определяем длительность шага
+        if step["step"] == "ramp_temp":
+            ramp = step.get("ramp_time", 0)
+            hold = step.get("hold_time", 0)
+            duration = ramp + hold
+        elif step["step"] == "ramp_pressure":
+            ramp = step.get("ramp_time", 0)
+            hold = step.get("hold_time", 0)
+            duration = ramp + hold
+        elif step["step"] in ["pause", "cool", "pressure_control"]:
+            duration = step.get("duration", 0)
+        else:
+            duration = 0  # для шагов без времени
+
+        # Сохраняем длительность
+        state.set(f"press_{self.press_id}_step_duration_{self.name}", duration)
+
         state.set(f"press_{self.press_id}_current_step_{self.name}", {
             "index": self.current_step_index,
             "type": step.get("step"),
             "start_time": self.start_time,
             "target_temp": step.get("target_temp"),
             "target_pressure": step.get("target_pressure"),
-            "duration": step.get("duration", 0)
+            "с": step.get("duration", 0),
+            "duration": duration
         })
         state.set(f"press_{self.press_id}_step_status_{self.name}", "running")
         # ✅ Устанавливаем время шага в state
         state.set(f"press_{self.press_id}_step_elapsed_{self.name}", 0.0)
+        state.set(f"press_{self.press_id}_step_running_{self.name}", True)
         logging.info(f"SE Пресс-{self.press_id} ({self.name}): шаг {self.current_step_index + 1} '{step.get('step')}'")
 
     def _on_step_complete(self, step: Dict):
@@ -87,6 +117,8 @@ class StepEngine:
 
         if self.done_callback:
             self.done_callback(step)
+
+
 
     def _execute_step(self, step: Dict) -> bool:
         """Выполняет один шаг. Возвращает True, если завершён."""
@@ -198,20 +230,20 @@ class StepEngine:
     def _execute_lift_to_limit(self, step: Dict) -> bool:
         try:
             press_cfg = self.hw_config["presses"][self.press_id - 1]
-            valves = press_cfg["valves"]
-            di_module = self.hw_config["common"]["di_module_2"]
+            di_module = press_cfg["control_inputs"]["limit_switch"]["module"]
             limit_bit = press_cfg["control_inputs"]["limit_switch"]["bit"]
         except (IndexError, KeyError) as e:
             logging.error(f"SE Пресс-{self.press_id}: ошибка конфига: {e}")
             return False
 
-        state.write_do_bit(valves["lift_up"]["module"], valves["lift_up"]["bit"], True)
-
+        # write
+        state.set(f"press_{self.press_id}_valve_lift_up", True)
+        # wheat
         di_value = state.get(f"di_module_{di_module}", 0)
         limit_reached = bool(di_value & (1 << limit_bit))
 
         if limit_reached:
-            state.write_do_bit(valves["lift_up"]["module"], valves["lift_up"]["bit"], False)
+            state.set(f"press_{self.press_id}_valve_lift_up", False)
             logging.info(f"SE Пресс-{self.press_id}: подъём завершён")
             self._complete_step()
             return True
@@ -270,7 +302,8 @@ class StepEngine:
             self._open_start_time = time.time()
             try:
                 valves = self.hw_config["presses"][self.press_id - 1]["valves"]
-                state.write_do_bit(valves["open"]["module"], valves["open"]["bit"], True)
+                #state.write_do_bit(valves["open"]["module"], valves["open"]["bit"], True)
+                state.set(f"press_{self.press_id}_valve_lift_down", True)
                 state.set(f"press_{self.press_id}_target_temp", None)
             except Exception as e:
                 logging.error(f"SE Пресс-{self.press_id}: ошибка при размыкании: {e}")
@@ -279,7 +312,8 @@ class StepEngine:
         if elapsed >= 5.0:
             try:
                 valves = self.hw_config["presses"][self.press_id - 1]["valves"]
-                state.write_do_bit(valves["open"]["module"], valves["open"]["bit"], False)
+                #state.write_do_bit(valves["open"]["module"], valves["open"]["bit"], False)
+                state.set(f"press_{self.press_id}_valve_lift_down", False)
             except Exception as e:
                 logging.error(f"SE Пресс-{self.press_id}: ошибка выключения клапана: {e}")
             logging.info(f"SE Пресс-{self.press_id}: размыкание завершено")
@@ -304,6 +338,8 @@ class StepEngine:
     def _complete_step(self):
         """Завершает текущий шаг"""
         state.set(f"press_{self.press_id}_step_status_{self.name}", "completed")
+        # ✅ Останавливаем счёт времени
+        state.set(f"press_{self.press_id}_step_running_{self.name}", False)
         # Удаляем временные атрибуты
         for attr in ['_ramp_start_time', '_hold_start_time', '_pressure_start_time',
                      '_open_start_time', '_pause_start_time', '_cool_start_time']:
@@ -341,17 +377,37 @@ class StepExecutor(threading.Thread):
 
     def run(self):
         logging.info(f"SE Пресс-{self.press_id}: запущен")
+        # ✅ Начинаем отсчёт общего времени
+        state.set(f"press_{self.press_id}_cycle_start_time", time.time())
+        state.set(f"press_{self.press_id}_cycle_elapsed", 0.0)
+        state.set(f"press_{self.press_id}_cycle_running", True)
+
         self.running = True
         while self.running:
             try:
                 self.temp_engine.update()
                 self.press_engine.update()
+
+                # ✅ Обновляем общее время цикла
+                if state.get(f"press_{self.press_id}_cycle_running", False):
+                    start = state.get(f"press_{self.press_id}_cycle_start_time")
+                    if start:
+                        elapsed = time.time() - start
+                        total = state.get(f"press_{self.press_id}_cycle_elapsed", 0.0)
+                        # Накапливаем, но не пересчитываем каждый раз
+                        state.set(f"press_{self.press_id}_cycle_elapsed", total + elapsed)
+                        state.set(f"press_{self.press_id}_cycle_start_time", time.time())
             except Exception as e:
                 logging.error(f"SE Пресс-{self.press_id}: ошибка в цикле: {e}")
-            time.sleep(0.1)
+            time.sleep(0.04)
+
+        # ✅ При остановке — останавливаем счёт
+        state.set(f"press_{self.press_id}_cycle_running", False)
 
     def stop(self):
         self.running = False
         self.temp_engine.active = False
         self.press_engine.active = False
+        # ✅ Останавливаем счёт времени
+        state.set(f"press_{self.press_id}_cycle_running", False)
         logging.info(f"SE Пресс-{self.press_id}: остановлен")

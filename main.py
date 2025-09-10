@@ -213,6 +213,9 @@ def command_loop():
             elif cmd == "34":
                 print("ВСЁ состояние системы:")
                 print(state.get_all())
+            elif cmd == "35":
+                print("ВСЁ состояние системы:")
+                print_structured_state_full()
             elif cmd == "d" or cmd == "10":
                 print("\n🔧 Запуск диагностики оборудования...")
                 try:
@@ -308,6 +311,111 @@ def print_structured_state():
                     f"    Давл:  {press_step.get('index', '-')} | {press_step.get('type', '-')} | Цель: {press_step.get('target_pressure', 'N/A')} МПа")
 
     print("=" * 60)
+
+
+def print_structured_state_full():
+    print("\n" + "=" * 70)
+    print("📊 СОСТОЯНИЕ СИСТЕМЫ")
+    print("=" * 70)
+
+    data = state.get_all()
+
+    # --- ПРЕССЫ ---
+    for pid in [1, 2, 3]:
+        if not any(k.startswith(f"press_{pid}_") for k in data):
+            continue
+
+        print(f"\n🔧 ПРЕСС-{pid}")
+
+        # Статус
+        running = data.get(f"press_{pid}_running", False)
+        paused = data.get(f"press_{pid}_paused", False)
+        completed = data.get(f"press_{pid}_completed", False)
+
+        if running:
+            status = "⏸️ ПАУЗА" if paused else "▶️ РАБОТАЕТ"
+        elif completed:
+            status = "✅ ЗАВЕРШЁН"
+        else:
+            status = "⏹️ ОСТАНОВЛЕН"
+
+        print(f"  Статус: {status}")
+
+        # Температура
+        temps = data.get(f"press_{pid}_temps", [None]*8)[:7]
+        target_temp = data.get(f"press_{pid}_target_temp", "N/A")
+        step_temp = data.get(f"press_{pid}_current_step_temperature", {})
+        step_temp_type = step_temp.get("type", "—")
+        step_temp_index = step_temp.get("index", "-")
+        step_time_temp = data.get(f"press_{pid}_step_elapsed_temperature", 0.0)
+
+        print(f"  Темп:     {format_temps(temps)}")
+        print(f"  Уставка:  {target_temp}°C | Шаг {step_temp_index}: {step_temp_type} ({format_time(step_time_temp)})")
+
+        # Давление
+        pressure = data.get(f"press_{pid}_pressure", "N/A")
+        target_pressure = data.get(f"press_{pid}_target_pressure", "N/A")
+        step_press = data.get(f"press_{pid}_current_step_pressure", {})
+        step_press_type = step_press.get("type", "—")
+        step_press_index = step_press.get("index", "-")
+        step_time_press = data.get(f"press_{pid}_step_elapsed_pressure", 0.0)
+
+        print(f"  Давление: {pressure} МПа → {target_pressure} МПа")
+        print(f"            Шаг {step_press_index}: {step_press_type} ({format_time(step_time_press)})")
+
+        # Цикл
+        cycle_elapsed = data.get(f"press_{pid}_cycle_elapsed", 0.0)
+        print(f"  Время цикла: {format_time(cycle_elapsed)}")
+
+    # --- ВХОДЫ (DI) ---
+    print(f"\n🔌 ВХОДЫ (DI)")
+    for mod in ["37", "38", "39"]:
+        val = data.get(f"di_module_{mod}", 0)
+        print(f"  DI-{mod}: {val:04X} ({bin(val)[2:].zfill(16)})")
+
+    # --- ВЫХОДЫ (DO) ---
+    print(f"\n⚙️  ВЫХОДЫ (DO)")
+    for mod in ["31", "32", "33", "34"]:
+        val = data.get(f"do_state_{mod}", 0)
+        print(f"  DO-{mod}: {val:04X} ({bin(val)[2:].zfill(16)})")
+
+    # --- ОЧЕРЕДИ ---
+    urgent_do = data.get("urgent_do", {})
+    heating_do = data.get("heating_do", {})
+    print(f"\n📤 ОЧЕРЕДИ ЗАПИСИ")
+    if urgent_do:
+        for mod, (lo, hi) in urgent_do.items():
+            print(f"  СРОЧНО: DO-{mod} → {lo:02X} {hi:02X}")
+    else:
+        print("  Срочные команды: пусто")
+
+    if heating_do:
+        for mod, (lo, hi) in heating_do.items():
+            print(f"  НАГРЕВ:  DO-{mod} → {lo:02X} {hi:02X}")
+    else:
+        print("  Команды нагрева: пусто")
+
+    # --- DCON СТАТИСТИКА ---
+    dcon = data.get("dcon_stats", {})
+    if dcon:
+        print(f"\n📡 DCON СТАТИСТИКА (за {dcon.get('period', 0):.0f} с)")
+        print(f"  Качество: {dcon.get('quality', 0):.1f}% | Скорость: {dcon.get('speed', 0):.1f} ком/с")
+        print(f"  Всего: {dcon.get('total', 0)}, Good: {dcon.get('good', 0)}, Bad: {dcon.get('bad', 0)}")
+        by_mod = ", ".join([f"{k}:{v}" for k, v in dcon.get("by_module", {}).items()])
+        print(f"  По модулям: {by_mod}")
+
+    print("=" * 70)
+
+
+# Вспомогательные функции
+def format_temps(temps):
+    return " | ".join(f"{t:5.1f}" if t is not None else "  N/A " for t in temps)
+
+
+def format_time(seconds):
+    mins = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{mins:2d}:{secs:02d}"
 
 
 atexit.register(cleanup)
