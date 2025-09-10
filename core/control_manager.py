@@ -370,7 +370,6 @@ class ControlManager(Thread):
         return target_temp is not None
 
     def _ensure_all_off(self):
-
         modules = [self.lamp_do_module, self.heating_do_module, "31"]
         print(f"CM press {self.press_id} off modules {modules}")
         urgent = state.get("urgent_do", {})
@@ -385,7 +384,6 @@ class ControlManager(Thread):
                 program = json.load(f)
             first_step = program.get("temp_program", [{}])[0]
             target_temp = first_step.get("target_temp", 50.0)
-
 
             # Устанавливаем уставку
             state.set(f"press_{self.press_id}_target_temp", target_temp)

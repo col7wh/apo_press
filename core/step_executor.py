@@ -77,11 +77,14 @@ class StepEngine:
             "duration": step.get("duration", 0)
         })
         state.set(f"press_{self.press_id}_step_status_{self.name}", "running")
+        # ✅ Устанавливаем время шага в state
+        state.set(f"press_{self.press_id}_step_elapsed_{self.name}", 0.0)
         logging.info(f"SE Пресс-{self.press_id} ({self.name}): шаг {self.current_step_index + 1} '{step.get('step')}'")
 
     def _on_step_complete(self, step: Dict):
         """Вызывается при завершении шага"""
         state.set(f"press_{self.press_id}_step_status_{self.name}", "completed")
+
         if self.done_callback:
             self.done_callback(step)
 

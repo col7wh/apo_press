@@ -45,12 +45,18 @@ class TemperatureController(threading.Thread):
         self.heating = [False] * self.zones
 
         logging.info(f"TC Пресс-{press_id}: TemperatureController инициализирован. Модуль {self.do_module}")
-        self.pids = []
-        self.offsets = []
 
         # Загрузка конфига
+        self.pids = []
+        self.offsets = []
+        self.load_config(self.press_id)
+
+    def load_config(self, id: int):
+        self.pids = []
+        self.offsets = []
+        # Загрузка конфига
         with open("config/pid_config.json", "r") as f:
-            pid_cfg = json.load(f)["presses"][press_id - 1]
+            pid_cfg = json.load(f)["presses"][id - 1]
 
         for zone_cfg in pid_cfg["zones"]:
             pid = PIDController(
@@ -67,7 +73,7 @@ class TemperatureController(threading.Thread):
         if 0 <= zone < self.zones:
             self.targets[zone] = temp
             self.enabled[zone] = True
-            logging.info(f"TC Пресс-{self.press_id}, зона {zone+1}: уставка = {temp}°C")
+            logging.info(f"TC Пресс-{self.press_id}, зона {zone + 1}: уставка = {temp}°C")
         else:
             logging.error(f"TC Пресс-{self.press_id}: некорректная зона: {zone}")
 
@@ -84,7 +90,7 @@ class TemperatureController(threading.Thread):
             self.enabled[zone] = False
             self.targets[zone] = None
             self._update_do_output()  # Обновляем DO
-            logging.warning(f"TC Пресс-{self.press_id}, зона {zone+1}: отключена")
+            logging.warning(f"TC Пресс-{self.press_id}, зона {zone + 1}: отключена")
         else:
             logging.error(f"TC Пресс-{self.press_id}: некорректная зона: {zone}")
 
@@ -103,7 +109,6 @@ class TemperatureController(threading.Thread):
     def _update_do_output(self):
         """Обновляет DO, включая/выключая нужные каналы"""
         for zone in range(self.zones):
-
             ch = self.heater_channels[zone]  # Правильный бит на DO-модуле
             desired = self.heating[zone]
             print(f"TC heat {self.do_module}, {ch}, {desired}")
@@ -118,7 +123,7 @@ class TemperatureController(threading.Thread):
             logging.error(f"TC Пресс-{self.press_id}: ошибка чтения DO: {e}")
             return 0
 
-    def heat_to_(self,  zones: List[int] = None) -> bool:
+    def heat_to_(self, zones: List[int] = None) -> bool:
         """
         Упрощённый режим: нагрев до температуры.
         Возвращает True, когда все зоны достигли цели (с гистерезисом).
@@ -162,17 +167,19 @@ class TemperatureController(threading.Thread):
         self.running = False
         state.set(f"press_{self.press_id}_target_temp", None)
         for ch in self.heater_channels:
-            #state.write_do_bit(self.do_module, ch, False)
+            # state.write_do_bit(self.do_module, ch, False)
             state.set_do_command(self.do_module, 0, 0, urgent=False)
 
     def run(self):
         logging.info(f"TC Пресс-{self.press_id}: поток нагрева запущен")
         while self.running:
             self.update()
+            self.load_config(self.press_id)
             time.sleep(0.1)
 
     def update(self):
         target_temp = state.get(f"press_{self.press_id}_target_temp")
+        # if target is None
         if target_temp is None:
             # 🔥 Выключаем ТОЛЬКО свои каналы
             current_state = state.read_digital(self.do_module) or 0
@@ -233,6 +240,7 @@ class TemperatureController(threading.Thread):
         logging.info(f"TC Пресс-{self.press_id}: остановлен")
         self.running = False
 
+
 # -----------------------------
 # Режим отладки: __main__
 # -----------------------------
@@ -240,10 +248,12 @@ class TemperatureController(threading.Thread):
 if __name__ == "__main__":
     import os
 
+
     def clear_screen():
         sys.stdout.write("\033[H")
         sys.stdout.write("\033[J")
         sys.stdout.flush()
+
 
     def clear_line(count=1):
         for _ in range(count):
@@ -251,6 +261,7 @@ if __name__ == "__main__":
             sys.stdout.write("\033[A")
         sys.stdout.write("\033[B" * count)
         sys.stdout.flush()
+
 
     print("🔧 Тестирование TemperatureController — многозонный нагрев")
 
@@ -263,6 +274,7 @@ if __name__ == "__main__":
         print("✅ Мок-режим активирован ----")
     elif choice == "2":
         from core.hardware_interface import HardwareInterface
+
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         config_path = os.path.join(project_root, "config", "system.json")
 
@@ -285,7 +297,7 @@ if __name__ == "__main__":
         print("❌ Неверный ID")
         exit(1)
 
-    #tc = TemperatureController(press_id=press_id, hardware_interface=hw)
+    # tc = TemperatureController(press_id=press_id, hardware_interface=hw)
     # test
     tc = TemperatureController(press_id=press_id)
     print(f"\n🔧 Управление нагревом пресса {press_id} запущено")
@@ -334,7 +346,7 @@ if __name__ == "__main__":
             for z in range(8):
                 t = temps[z] if temps[z] is not None else "N/A"
                 s = status[z]
-                print(f"  Зона {z+1}| {s}")
+                print(f"  Зона {z + 1}| {s}")
             input("\nНажмите Enter...")
 
         elif cmd == "5":

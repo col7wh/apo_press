@@ -47,7 +47,7 @@ class GraphTransmitter(threading.Thread):
     def start(self) -> None:
         """Переопределённый start() для предварительной настройки"""
         if not self.enabled:
-            logging.info("[GRAPH] ❌ Отключён в конфигурации")
+            logging.info("[GRAPH] Отключён в конфигурации")
             return
         self.load_config()
         try:
@@ -61,10 +61,10 @@ class GraphTransmitter(threading.Thread):
                 write_timeout=2
             )
             time.sleep(1)  # Дать порту стабилизироваться
-            logging.info(f"[GRAPH] ✅ Подключено к {self.port} @ {self.baudrate}")
+            logging.info(f"[GRAPH] Подключено к {self.port} @ {self.baudrate}")
             super().start()  # Запускаем run()
         except Exception as e:
-            logging.error(f"[GRAPH] ❌ Не удалось открыть {self.port}: {e}")
+            logging.error(f"[GRAPH] Не удалось открыть {self.port}: {e}")
 
     def run(self) -> None:
         """Основной цикл потока"""
@@ -76,16 +76,16 @@ class GraphTransmitter(threading.Thread):
                 if self.ser.in_waiting > 0:
                     data = self.ser.read(self.ser.in_waiting)
                     if b'*' in data:
-                        logging.info("[GRAPH] 📥 Получено: '*'")
+                        #logging.info("[GRAPH]  Получено: '*'")
                         self.send_packet()
                 time.sleep(0.1)
             except Exception as e:
-                logging.error(f"[GRAPH] ⚠️ Ошибка в цикле: {e}")
+                logging.error(f"[GRAPH] ️ Ошибка в цикле: {e}")
                 time.sleep(1)
 
         if self.ser and self.ser.is_open:
             self.ser.close()
-        logging.info("[GRAPH] 🛑 Передатчик остановлен")
+        logging.info("[GRAPH] Передатчик остановлен")
 
     def send_packet(self) -> None:
         """Формирует и отправляет 66-байтный пакет"""
@@ -130,9 +130,9 @@ class GraphTransmitter(threading.Thread):
             for b in packet:
                 self.ser.write(bytes([b]))
                 time.sleep(0.001)
-            logging.info("[GRAPH] ✅ Пакет отправлен")
+            #logging.info("[GRAPH]  Пакет отправлен")
         except Exception as e:
-            logging.error(f"[GRAPH] ❌ Ошибка отправки: {e}")
+            logging.error(f"[GRAPH]  Ошибка отправки: {e}")
 
     def stop(self) -> None:
         """Остановка потока"""

@@ -305,28 +305,34 @@ class WebInterface(threading.Thread):
             data = request.get_json()
             # Преобразуем в структуру pid_config.json
             config = {"presses": []}
+
             for pid in [1, 2, 3]:
                 zones = []
                 for i in range(8):
+                    kp = data.get(f"p{pid}_kp_{i}")
+
                     zones.append({
-                        "Kp": data.get(f"p{pid}_kp_{i}", 2.5),
-                        "Ki": data.get(f"p{pid}_ki_{i}", 0.15),
-                        "Kd": data.get(f"p{pid}_kd_{i}", 0.8),
-                        "offset": data.get(f"p{pid}_offset_{i}", 0.0)
+                        "Kp": float(data.get(f"p{pid}_kp_{i}", 2.5)),
+                        "Ki": float(data.get(f"p{pid}_ki_{i}", 0.15)),
+                        "Kd": float(data.get(f"p{pid}_kd_{i}", 0.8)),
+                        "offset": float(data.get(f"p{pid}_offset_{i}", 0.0))
                     })
                 config["presses"].append({
                     "id": pid,
                     "zones": zones,
                     "pressure_pid": {
-                        "Kp": data.get(f"p{pid}_press_kp", 1.2),
-                        "Ki": data.get(f"p{pid}_press_ki", 0.05),
-                        "Kd": data.get(f"p{pid}_press_kd", 0.4)
+                        "Kp": float(data.get(f"p{pid}_press_kp", 1.2)),
+                        "Ki": float(data.get(f"p{pid}_press_ki", 0.05)),
+                        "Kd": float(data.get(f"p{pid}_press_kd", 0.4))
                     }
                 })
-            with open("config/pid_config.json", "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
-            return "OK"
+            #with open("config/pid_config.json", "w", encoding="utf-8") as f:
+                #json.dump(config, f, indent=4, ensure_ascii=False)
 
+            # 🔥 Просто сохраняем пришедший JSON
+            with open("config/pid_config.json", "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+            return "OK"
     def _get_timestamp(self):
         return datetime.now().strftime("%H:%M:%S")
 

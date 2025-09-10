@@ -17,16 +17,6 @@ from core.global_state import state
 from logging.handlers import TimedRotatingFileHandler
 
 
-
-#logging.basicConfig(
- #   level=logging.INFO,
-  #  format='%(asctime)s [MAIN] %(levelname)s: %(message)s',
-  #  handlers=[
-   #     logging.FileHandler("app.log", encoding="utf-8"),
-        # logging.StreamHandler()
-   # ]
-#)
-
 # Глобальные переменные
 hardware_interface: HardwareInterface = None
 # press_controllers: Dict[int, PressController] = {}
@@ -41,12 +31,12 @@ def setup_main_logger():
 
     handler = TimedRotatingFileHandler(
         log_file,
-        when="midnight",      # Ротация в полночь
-        interval=1,           # Каждый день
-        backupCount=7,        # Хранить 7 дней
+        when="midnight",  # Ротация в полночь
+        interval=1,  # Каждый день
+        backupCount=7,  # Хранить 7 дней
         encoding="utf-8"
     )
-    handler.suffix = "%Y-%m-%d"        # app.log.2025-09-01
+    handler.suffix = "%Y-%m-%d"  # app.log.2025-09-01
     handler.extMatch = r"\d{4}-\d{2}-\d{2}"  # Как распознавать старые
 
     formatter = logging.Formatter('%(asctime)s [MAIN] %(levelname)s: %(message)s')
@@ -59,8 +49,9 @@ def setup_main_logger():
     # Убедимся, что нет дублирующих хендлеров
     if not logging.getLogger().hasHandlers():
         logging.getLogger().addHandler(handler)
-
+    logging.info("="*50)
     logging.info("M Логирование инициализировано")
+
 
 def load_system_config() -> Dict[str, Any]:
     try:
@@ -249,19 +240,19 @@ def cleanup():
         cm.stop()
         cm.join(timeout=1.0)
 
-    # Финальная синхронизация: выключить всё
-    if hardware_interface:
-        do_modules = ["31", "32", "34", "35", "36"]
-        for mod in do_modules:
-            logging.info(f"M Финальное выключение DO-{mod}")
-            hardware_interface._send_command(f"#{mod}0000")
-            time.sleep(0.05)
-            hardware_interface._send_command(f"#{mod}0B00")
-
     # Остановка демона
     if daemon is not None:
         daemon.stop()
         daemon.join()
+
+    # Финальная синхронизация: выключить всё
+    if hardware_interface:
+        do_modules = ["31", "32", "33", "34"]
+        for mod in do_modules:
+            hardware_interface._send_command(f"#{mod}0000")
+            time.sleep(0.05)
+            hardware_interface._send_command(f"#{mod}0B00")
+            logging.info(f"M Финальное выключение DO-{mod}")
 
     # Закрытие интерфейса
     if hardware_interface is not None:
@@ -356,7 +347,6 @@ def main():
         # Создаём PressController, но НЕ запускаем
         # press_controllers[pid] = PressController(press_id=pid, config=hw_config)
 
-
     cmd_thread = threading.Thread(target=command_loop, daemon=True)
     cmd_thread.start()
 
@@ -369,14 +359,13 @@ def main():
     graph_tx = GraphTransmitter()
     graph_tx.start()
 
-
     try:
         while running:
             time.sleep(0.1)
     except KeyboardInterrupt:
         logging.info("M Получен сигнал завершения (Ctrl+C).")
-    finally:
-        cleanup()
+    #finally:
+        #cleanup()
 
 
 if __name__ == "__main__":

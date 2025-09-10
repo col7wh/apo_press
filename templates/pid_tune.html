@@ -261,18 +261,22 @@
             });
         }
 
+
         function updateZone(pid, idx, key, value) {
-            config[`press${pid}`].zones[idx][key] = parseFloat(value) || 0;
+            const val = parseFloat(value);
+            config[`press${pid}`].zones[idx][key] = isNaN(val) ? 0 : val;
         }
 
+
         function saveCurrent(pressId) {
-            const data = {
-                presses: [
-                    config.press1,
-                    config.press2,
-                    config.press3
-                ]
-            };
+                // Формируем полную структуру с id
+                const data = {
+                    presses: [
+                        { id: 1, zones: config.press1.zones, pressure_pid: config.press1.pressure_pid },
+                        { id: 2, zones: config.press2.zones, pressure_pid: config.press2.pressure_pid },
+                        { id: 3, zones: config.press3.zones, pressure_pid: config.press3.pressure_pid }
+                    ]
+                };
             fetch('/save_pid_config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -281,7 +285,14 @@
         }
 
         function saveAsCurrent(pressId) {
-            const data = { "presses": [config.press1, config.press2, config.press3] };
+            // Формируем полную структуру с id
+                const data = {
+                    presses: [
+                        { id: 1, zones: config.press1.zones, pressure_pid: config.press1.pressure_pid },
+                        { id: 2, zones: config.press2.zones, pressure_pid: config.press2.pressure_pid },
+                        { id: 3, zones: config.press3.zones, pressure_pid: config.press3.pressure_pid }
+                    ]
+                };
             const blob = new Blob([JSON.stringify(data, null, 4)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
