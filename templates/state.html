@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>📊 Состояние системы</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+            font-size: 13px;
+            padding: 10px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #1976d2;
+            margin-bottom: 20px;
+        }
+        .btn-back {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: #1976d2;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 12px;
+            z-index: 100;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .btn-back:hover {
+            background: #0d47a1;
+        }
+        .section {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+        .press-section {
+            padding: 16px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-family: monospace;
+        }
+        .label {
+            color: #aaa;
+            width: 200px;
+            display: inline-block;
+        }
+        .value {
+            color: #64b5f6;
+            font-weight: 500;
+        }
+        .status-running {
+            color: #81c784;
+        }
+        .status-paused {
+            color: #ffb74d;
+        }
+        .status-stopped {
+            color: #e57373;
+        }
+        .temps {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .temp-item {
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Состояние системы (Global State)</h1>
+        <a href="/" class="btn-back">← Назад</a>
+
+        <div id="stateContainer">
+            <!-- Прессы будут вставлены сюда -->
+        </div>
+    </div>
+
+    <script>
+        const container = document.getElementById('stateContainer');
+
+        function renderState(data) {
+            container.innerHTML = '';
+
+            // Группируем данные по прессам
+            const presses = [1, 2, 3];
+            presses.forEach(pid => {
+                const pressDiv = document.createElement('div');
+                pressDiv.className = 'press-section';
+
+                const running = data[`press_${pid}_running`] === true;
+                const paused = data[`press_${pid}_paused`] === true;
+                const statusClass = running ? (paused ? 'status-paused' : 'status-running') : 'status-stopped';
+                const statusText = running ? (paused ? 'ПАУЗА' : 'РАБОТАЕТ') : 'ОСТАНОВЛЕН';
+
+                const temps = data[`press_${pid}_temps`] || [];
+                const pressure = data[`press_${pid}_pressure`] || 0;
+                const targetTemp = data[`press_${pid}_target_temp`] || 'N/A';
+                const targetPressure = data[`press_${pid}_target_pressure`] || 'N/A';
+
+                // Текущие шаги
+                const tempStep = data[`press_${pid}_current_step_temperature`] || {};
+                const pressStep = data[`press_${pid}_current_step_pressure`] || {};
+
+                const cycleTime = Math.round(data[`press_${pid}_cycle_elapsed`] || 0);
+
+                pressDiv.innerHTML = `
+                    <h3>🔧 Пресс ${pid+1} <span class="${statusClass}">${statusText}</span></h3>
+
+                    <div class="info-row">
+                        <span class="label">Температура:</span>
+                        <span class="temps">${temps.slice(0,7).map(t => `<span class="temp-item">${t?.toFixed(1)}°C</span>`).join('')}</span>
+                    </div>
+
+                    <div class="info-row">
+                        <span class="label">Давление:</span>
+                        <span class="value">${pressure.toFixed(3)} МПа → ${targetPressure} МПа</span>
+                    </div>
+
+                    <div class="info-row">
+                        <span class="label">Нагрев:</span>
+                        <span class="value">${targetTemp} °C</span>
+                    </div>
+
+                    <div class="info-row">
+                        <span class="label">Цикл:</span>
+                        <span class="value">${formatTime(cycleTime)}</span>
+                    </div>
+
+                    <div class="section">
+                        <h4>🔄 Текущий шаг</h4>
+                        <div class="info-row">
+                            <span class="label">Темп:</span>
+                            <span>${tempStep.index !== undefined ? `${tempStep.index+1}: ${tempStep.type}` : '—'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Давл:</span>
+                            <span>${pressStep.index !== undefined ? `${pressStep.index+1}: ${pressStep.type}` : '—'}</span>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h4>⚙️ Клапаны</h4>
+                        <div class="info-row">
+                            <span class="label">Подъём:</span>
+                            <span>${data[`press_${pid}_valve_lift_up`] ? '⬆️ ВКЛ' : '⏹️ ВЫКЛ'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Опускание:</span>
+                            <span>${data[`press_${pid}_valve_lift_down`] ? '⬇️ ВКЛ' : '⏹️ ВЫКЛ'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Открытие формы:</span>
+                            <span>${data[`press_${pid}_valve_open`] ? '🔓 ВКЛ' : '⏹️ ВЫКЛ'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Закрытие формы:</span>
+                            <span>${data[`press_${pid}_valve_close`] ? '🔒 ВКЛ' : '⏹️ ВЫКЛ'}</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(pressDiv);
+            });
+
+            // DCON статистика
+            const dcon = data.dcon_stats || {};
+            const dconDiv = document.createElement('div');
+            dconDiv.className = 'section';
+            dconDiv.innerHTML = `
+                <h3>📡 DCON Статистика</h3>
+                <div class="info-row">
+                    <span class="label">Качество:</span>
+                    <span class="value">${dcon.quality?.toFixed(1)}%</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Скорость:</span>
+                    <span class="value">${dcon.speed?.toFixed(1)} ком/с</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Всего:</span>
+                    <span>${dcon.total}</span>
+                </div>
+            `;
+            container.appendChild(dconDiv);
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function fetchState() {
+            fetch('/get_state')
+                .then(r => r.json())
+                .then(data => {
+                    renderState(data);
+                })
+                .catch(e => {
+                    console.error("Ошибка загрузки состояния:", e);
+                    container.innerHTML = "<div class='error'>❌ Не удалось загрузить состояние</div>";
+                });
+        }
+
+        // Первый раз — сразу
+        fetchState();
+
+        // Потом — каждые 2 сек
+        setInterval(fetchState, 2000);
+    </script>
+</body>
+</html>

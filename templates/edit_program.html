@@ -148,12 +148,20 @@
         <h1>🔧 Редактор программ</h1>
         <a href="/" class="btn-back">← Назад</a>
         <div class="tabs">
-            <button class="tab active" data-tab="press1">Пресс 1</button>
-            <button class="tab" data-tab="press2">Пресс 2</button>
-            <button class="tab" data-tab="press3">Пресс 3</button>
+            <button class="tab active" data-tab="press1">Пресс 2</button>
+            <button class="tab" data-tab="press2">Пресс 3</button>
+            <button class="tab" data-tab="press3">Пресс 4</button>
         </div>
 
         <div id="press1" class="form-section active">
+            <div class="form-group">
+                <span>Название детали  </span>
+                <input type="text" id="programName1" placeholder="Введите название детали" onchange="updateProgramName(1)">
+
+                <button class="btn" onclick="saveCurrent(1)">💾 Сохранить</button>
+                <button class="btn btn-secondary" onclick="saveAsCurrent(1)">💾 Сохранить как…</button>
+                <button class="btn btn-danger" onclick="loadIntoPress(1)">📂 Открыть</button>
+            </div>
             <h3>Температура</h3>
             <div id="tempSteps1"></div>
             <button type="button" onclick="addTempStep(1)">+ Добавить шаг</button>
@@ -164,15 +172,19 @@
             <button type="button" onclick="addPressStep(1)">+ Добавить шаг</button>
             <div class="time-summary" id="pressTime1">Суммарное время: 0 с</div>
 
-            <div class="actions">
-                <button class="btn" onclick="saveCurrent(1)">💾 Сохранить</button>
-                <button class="btn btn-secondary" onclick="saveAsCurrent(1)">💾 Сохранить как…</button>
-                <button class="btn btn-danger" onclick="loadIntoPress(1)">📂 Открыть</button>
-            </div>
+
         </div>
 
         <div id="press2" class="form-section">
             <!-- Повтор для пресса 2 -->
+            <div class="form-group">
+                <span>Название детали  </span>
+                <input type="text" id="programName2" placeholder="Введите название детали" onchange="updateProgramName(2)">
+
+                <button class="btn" onclick="saveCurrent(2)">💾 Сохранить</button>
+                <button class="btn btn-secondary" onclick="saveAsCurrent(2)">💾 Сохранить как…</button>
+                <button class="btn btn-danger" onclick="loadIntoPress(2)">📂 Открыть</button>
+            </div>
             <h3>Температура</h3>
             <div id="tempSteps2"></div>
             <button type="button" onclick="addTempStep(2)">+ Добавить шаг</button>
@@ -183,15 +195,18 @@
             <button type="button" onclick="addPressStep(2)">+ Добавить шаг</button>
             <div class="time-summary" id="pressTime2">Суммарное время: 0 с</div>
 
-            <div class="actions">
-                <button class="btn" onclick="saveCurrent(2)">💾 Сохранить</button>
-                <button class="btn btn-secondary" onclick="saveAsCurrent(2)">💾 Сохранить как…</button>
-                <button class="btn btn-danger" onclick="loadIntoPress(2)">📂 Открыть</button>
-            </div>
+
         </div>
 
         <div id="press3" class="form-section">
             <!-- Повтор для пресса 3 -->
+             <div class="form-group">
+                <span>Название детали  </span>
+                <input type="text" id="programName3" placeholder="Введите название детали" onchange="updateProgramName(3)">
+                <button class="btn" onclick="saveCurrent(3)">💾 Сохранить</button>
+                <button class="btn btn-secondary" onclick="saveAsCurrent(3)">💾 Сохранить как…</button>
+                <button class="btn btn-danger" onclick="loadIntoPress(3)">📂 Открыть</button>
+            </div>
             <h3>Температура</h3>
             <div id="tempSteps3"></div>
             <button type="button" onclick="addTempStep(3)">+ Добавить шаг</button>
@@ -202,15 +217,29 @@
             <button type="button" onclick="addPressStep(3)">+ Добавить шаг</button>
             <div class="time-summary" id="pressTime3">Суммарное время: 0 с</div>
 
-            <div class="actions">
-                <button class="btn" onclick="saveCurrent(3)">💾 Сохранить</button>
-                <button class="btn btn-secondary" onclick="saveAsCurrent(3)">💾 Сохранить как…</button>
-                <button class="btn btn-danger" onclick="loadIntoPress(3)">📂 Открыть</button>
-            </div>
+
         </div>
     </div>
 
     <script>
+        function secondsToMinSec(seconds) {
+            if (seconds === undefined || seconds === null) return '';
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}.${secs.toString().padStart(2, '0')}`;
+        }
+
+        function minSecToSeconds(str) {
+            if (!str) return undefined;
+            const match = str.toString().trim().match(/^(\d+)(?:\.(\d{1,2}))?$/);
+            if (!match) return undefined;
+            const mins = parseInt(match[1], 10);
+            const secs = match[2] ? parseInt(match[2].padEnd(2, '0'), 10) : 0;
+                // Ограничиваем секунды до 59
+            if (secs >= 60) return undefined;
+            return mins * 60 + secs;
+        }
+
         const stepLabels = {
             'ramp_temp': 'Нагрев до температуры',
             'hold': 'Выдержка',
@@ -242,11 +271,22 @@
 
         function renderAll() {
             for (let pid = 1; pid <= 3; pid++) {
+                const nameInput = document.getElementById(`programName${pid}`);
+                nameInput.value = programs[`press${pid}`].name || '';
                 renderTempSteps(pid);
                 renderPressSteps(pid);
                 updateTimes(pid);
             }
         }
+
+         function renderC(pid) {
+                const nameInput = document.getElementById(`programName${pid}`);
+                nameInput.value = programs[`press${pid}`].name || '';
+                renderTempSteps(pid);
+                renderPressSteps(pid);
+                updateTimes(pid);
+        }
+
 
         function renderTempSteps(pid) {
             const container = document.getElementById(`tempSteps${pid}`);
@@ -270,13 +310,15 @@
                     </div>
 
                     <div class="field">
-                        <label>Время подъёма (с)</label>
-                        <input type="number" placeholder="Время подъёма (с)" value="${step.ramp_time || ''}" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+                        <label>Время подъёма (мин.с)</label>
+                        <input type="text" placeholder="Время подъёма мин.сс" value="${secondsToMinSec(step.ramp_time)}" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+
                     </div>
 
                     <div class="field">
-                        <label>Выдержка (с)</label>
-                        <input type="number" placeholder="Выдержка (с)" value="${step.hold_time || ''}" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+                        <label>Выдержка (мин.с)</label>
+                        <input type="text" placeholder="Выдержка мин.сс" value="${secondsToMinSec(step.hold_time)}" onchange="updateStep(this, 'temp', ${pid}, ${i})">
+
                     </div>
                     <button onclick="removeTempStep(${pid}, ${i})">–</button>
                 `;
@@ -288,40 +330,57 @@
             const container = document.getElementById(`pressSteps${pid}`);
             container.innerHTML = '';
             programs[`press${pid}`].pressure_program.forEach((step, i) => {
-                const div = document.createElement('div');
-                div.className = 'step';
-                const target = step.target_pressure !== undefined ? step.target_pressure : '';
-                const ramp = step.ramp_time !== undefined ? step.ramp_time : '';
-                const hold = step.hold_time !== undefined ? step.hold_time : '';
+            const div = document.createElement('div');
+            div.className = 'step';
 
-                div.innerHTML = `
-                     <div class="field">
-                        <label>Название шага</label>
-                    <select onchange="updatePressStepType(this, ${pid}, ${i})">
-                        ${Object.values(stepLabels).map(label => `
-                            <option value="${label}" ${stepLabels[step.step] === label ? 'selected' : ''}>${label}</option>
-                        `).join('')}
-                    </select>
-                    </div>
-                        <div class="field">
-                            <label>Цель (МПа)</label>
-                            <input type="number" placeholder="Цель (МПа)" value="${target}" step="0.1" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
-                        </div>
+            const target = step.target_pressure !== undefined ? step.target_pressure : '';
+            const ramp = step.ramp_time !== undefined ? step.ramp_time : '';
+            const hold = step.hold_time !== undefined ? step.hold_time : '';
 
-                    <div class="field">
-                            <label>Время (с)</label>
-                            <input type="number" placeholder="Время (с)" value="${ramp}" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
-                    </div>
+        // 🟢 Проверяем тип шага
+        const isMoldStep = ['lift_to_limit', 'open_mold'].includes(step.step);
 
-                    <div class="field">
-                            <label>Выдержка (с)</label>
-                            <input type="number" placeholder="Выдержка (с)" value="${hold}" onchange="updateStep(this, 'press', ${pid}, ${i})" ${['lift_to_limit', 'open_mold'].includes(step.step) ? 'disabled' : ''}>
-                    </div>
-                    <button onclick="removePressStep(${pid}, ${i})">–</button>
-                `;
-                container.appendChild(div);
-            });
-        }
+        // 🟢 Только для open_mold разрешаем hold_time
+        const disableRampAndTarget = isMoldStep && step.step === 'open_mold';
+
+        div.innerHTML = `
+            <div class="field">
+                <label>Название шага</label>
+                <select onchange="updatePressStepType(this, ${pid}, ${i})">
+                    ${Object.values(stepLabels).map(label => `
+                        <option value="${label}" ${stepLabels[step.step] === label ? 'selected' : ''}>${label}</option>
+                    `).join('')}
+                </select>
+            </div>
+
+            <div class="field">
+                <label>Цель (МПа)</label>
+                <input type="number" placeholder="Цель (МПа)"
+                       value="${target}" step="0.1"
+                       onchange="updateStep(this, 'press', ${pid}, ${i})"
+                       ${isMoldStep ? 'disabled' : ''}>
+            </div>
+
+            <div class="field">
+                <label>Время (мин.с)</label>
+                <input type="text" placeholder="Время мин.сс"
+                       value="${secondsToMinSec(ramp)}"
+                       onchange="updateStep(this, 'press', ${pid}, ${i})"
+                       ${disableRampAndTarget ? 'disabled' : ''}>
+            </div>
+
+            <div class="field">
+                <label>Выдержка (мин.с)</label>
+                <input type="text" placeholder="Выдержка мин.сс"
+                       value="${secondsToMinSec(hold)}"
+                       onchange="updateStep(this, 'press', ${pid}, ${i})"
+                       ${isMoldStep ? '' : ''}>  <!-- всегда активно -->
+            </div>
+            <button onclick="removePressStep(${pid}, ${i})">–</button>
+        `;
+        container.appendChild(div);
+    });
+}
 
         function updatePressStepType(select, pid, i) {
             const label = select.value;
@@ -332,9 +391,17 @@
             if (['lift_to_limit', 'open_mold'].includes(stepKey)) {
                 step.target_pressure = undefined;
                 step.ramp_time = undefined;
-                step.hold_time = undefined;
+                // ❗ Но hold_time остаётся — особенно для open_mold
+            if (stepKey !== 'open_mold') {
+                step.hold_time = undefined;  // только для lift_to_limit
             }
+        }
             renderPressSteps(pid);
+        }
+
+        function updateProgramName(pid) {
+            const input = document.getElementById(`programName${pid}`);
+            programs[`press${pid}`].name = input.value.trim() || undefined;
         }
 
         function updateStep(input, type, pid, i) {
@@ -342,10 +409,15 @@
                 ? programs[`press${pid}`].temp_program[i]
                 : programs[`press${pid}`].pressure_program[i];
 
-            const val = input.value !== '' ? parseFloat(input.value) : undefined;
+            //const val = input.value !== '' ? parseFloat(input.value) : undefined;
+            const val = minSecToSeconds(input.value); // Парсим X.YY → секунды
+
             if (input.placeholder.includes('Цель')) {
-                if (type === 'temp') step.target_temp = val;
-                else step.target_pressure = val;
+                    if (type === 'temp') {
+                        step.target_temp = input.value !== '' ? parseFloat(input.value) : undefined;
+                    } else {
+                        step.target_pressure = input.value !== '' ? parseFloat(input.value) : undefined;
+                    }
             } else if (input.placeholder.includes('подъёма') || input.placeholder.includes('Время')) {
                 step.ramp_time = val;
             } else if (input.placeholder.includes('Выдержка')) {
@@ -395,11 +467,14 @@
             document.getElementById(`pressTime${pid}`).textContent = `Суммарное время: ${formatTime(pressSum)}`;
         }
 
+
         function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins} мин ${secs} с`;
+            const totalSeconds = Math.round(seconds);
+            const mins = Math.floor(totalSeconds / 60);
+            const secs = totalSeconds % 60;
+            return `${mins} мин ${secs.toString().padStart(2, '0')} с`;
         }
+
 
         // ✅ Сохранить текущий пресс
         function saveCurrent(pressId) {
@@ -408,7 +483,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ press_id: pressId, program: program })
-            }).then(() => alert(`✅ Пресс-${pressId} сохранён в press${pressId}.json`));
+            }).then(() => alert(`✅ Пресс-${pressId+1} сохранён в press${pressId+1}.json`));
         }
 
         // ✅ Сохранить как… (браузерный диалог)
@@ -419,7 +494,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `press${pressId}_backup.json`;
+            a.download = `press${pressId+1}_backup.json`;
             a.click();
         }
 
@@ -433,9 +508,7 @@
                 const text = await file.text();
                 const loaded = JSON.parse(text);
                 programs[`press${pressId}`] = loaded;
-                renderTempSteps(pressId);
-                renderPressSteps(pressId);
-                updateTimes(pressId);
+                renderC(pressId)
             };
             input.click();
         }
@@ -448,6 +521,28 @@
                 tab.classList.add('active');
                 document.getElementById(tab.dataset.tab).classList.add('active');
             });
+        });
+
+
+        // === Автозамена запятой на точку в полях времени ===
+        document.addEventListener('input', function(e) {
+          const input = e.target;
+          // Проверяем, что это input и placeholder содержит "мин.с" или "Время"
+          if (input.tagName === 'INPUT' &&
+              input.type === 'text' &&
+              (input.placeholder.includes('мин.с') || input.placeholder.includes('Время'))) {
+
+            if (input.value && input.value.includes(',')) {
+              // Заменяем только первую запятую на точку (не трогаем другие символы)
+              const corrected = input.value.replace(',', '.');
+              if (corrected !== input.value) {
+                input.value = corrected;
+                // Имитируем новое событие изменения, чтобы updateStep() отработал
+                const event = new Event('change', { bubbles: true });
+                input.dispatchEvent(event);
+              }
+            }
+          }
         });
     </script>
 </body>

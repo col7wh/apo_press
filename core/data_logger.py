@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from threading import Thread, Lock
 from core.global_state import state
+from core.plot_thermal_data import ThermalProfilePlotter
 
 
 class DataLogger:
@@ -18,6 +19,7 @@ class DataLogger:
         self.thread = None
         self.lock = Lock()
         self.press_id = None
+        self.file_path = None
 
     def start(self, press_id: int):
         with self.lock:
@@ -31,6 +33,7 @@ class DataLogger:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             filename = f"press{press_id}_{timestamp}.csv"
             filepath = os.path.join(self.log_dir, filename)
+            self.file_path = filepath
 
             self.file = open(filepath, "w", newline="", encoding="utf-8")
             self.writer = csv.writer(self.file)
@@ -48,7 +51,7 @@ class DataLogger:
             # Запускаем поток
             self.thread = Thread(target=self._log_loop, daemon=True)
             self.thread.start()
-            logging.info(f"DL Пресс-{press_id}: логирование запущено → {filename}")
+            logging.info(f"DL Пресс-{press_id+ 1}: логирование запущено → {filename}")
 
     def _log_loop(self):
         last_write = time.time()
@@ -73,7 +76,7 @@ class DataLogger:
             index = step.get("index", "")
             step_type = step.get("type", "")
 
-            temps = state.get(f"press_{self.press_id}_temps", [None]*8)[:7]
+            temps = state.get(f"press_{self.press_id}_temps", [None] * 8)[:7]
             pressure = state.get(f"press_{self.press_id}_pressure", None)
             target_temp = state.get(f"press_{self.press_id}_target_temp", None)
             target_pressure = state.get(f"press_{self.press_id}_target_pressure", None)
@@ -111,8 +114,23 @@ class DataLogger:
             if self.file:
                 self.file.close()
                 self.file = None
-                logging.info(f"DL Пресс-{self.press_id}: логирование остановлено")
+                logging.info(f"DL Пресс-{self.press_id+ 1}: логирование остановлено")
 
     def is_running(self):
         with self.lock:
             return self.running
+
+    def plot_view(self):
+        plotter = ThermalProfilePlotter(
+            show_plot=True,
+            save=True,
+            ylim_temp=(0, 250)
+        )
+
+        result = plotter.plot(self.file_path)
+        if result['status'] == 'OK':
+            logging.info(f"DL Пресс-{self.press_id+ 1}: Успех {result['message']}")
+        else:
+            logging.info(f"DL Пресс-{self.press_id+ 1}: Ошибка {result['message']}")
+
+    # .logger.plot_view()

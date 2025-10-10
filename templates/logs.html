@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>📋 Логи системы</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+            font-size: 13px;
+            padding: 10px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #1976d2;
+            margin-bottom: 20px;
+        }
+        .btn-back {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: #1976d2;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 12px;
+            z-index: 100;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .btn-back:hover {
+            background: #0d47a1;
+        }
+        .log-container {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            line-height: 1.4;
+        }
+        .log-line {
+            margin: 2px 0;
+            white-space: pre-wrap;
+        }
+        /* Цвета для уровней */
+        .log-line.info { color: #81c784; }
+        .log-line.warning { color: #ffb74d; }
+        .log-line.error { color: #e57373; }
+        .log-line.debug { color: #90caf9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Логи приложения (app.log)</h1>
+        <a href="/" class="btn-back">← Назад</a>
+        <div id="logContainer" class="log-container"></div>
+    </div>
+
+    <script>
+        const logContainer = document.getElementById('logContainer');
+
+        function fetchLog() {
+            fetch('/get_app_log')
+                .then(r => r.text())
+                .then(text => {
+                    logContainer.innerHTML = ''; // Очищаем
+                    const lines = text.split('\n').filter(l => l.trim());
+
+                    lines.forEach(line => {
+                        const div = document.createElement('div');
+                        div.className = 'log-line';
+
+                        if (line.includes('[MAIN] INFO:') || line.includes('[HI] INFO:')) {
+                            div.classList.add('info');
+                        } else if (line.includes('WARNING')) {
+                            div.classList.add('warning');
+                        } else if (line.includes('ERROR') || line.includes('CRITICAL')) {
+                            div.classList.add('error');
+                        } else if (line.includes('DEBUG')) {
+                            div.classList.add('debug');
+                        }
+
+                        div.textContent = line;
+                        logContainer.appendChild(div);
+                    });
+
+                    // Прокрутка вниз
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                })
+                .catch(e => {
+                    console.error("Ошибка загрузки лога:", e);
+                    logContainer.innerHTML = "<div class='log-line error'>❌ Не удалось загрузить лог</div>";
+                });
+        }
+
+        // Первый раз — сразу
+        fetchLog();
+
+        // Потом — каждые 5 сек
+        setInterval(fetchLog, 5000);
+    </script>
+</body>
+</html>

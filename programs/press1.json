@@ -1,40 +1,27 @@
 {
+    "name": "21",
     "pressure_program": [
         {
-            "hold_time": 15,
-            "ramp_time": 1,
+            "hold_time": 10,
+            "ramp_time": 0,
             "step": "ramp_pressure",
             "target_pressure": 0
         },
         {
-            "step": "lift_to_limit"
-        },
-        {
-            "hold_time": 30,
-            "ramp_time": 1,
-            "step": "ramp_pressure",
-            "target_pressure": 50
-        },
-        {
-            "hold_time": 100,
-            "ramp_time": 1,
-            "step": "ramp_pressure",
-            "target_pressure": 1
-        },
-        {
+            "hold_time": 35,
             "step": "open_mold"
         }
     ],
     "temp_program": [
         {
-            "hold_time": 180,
-            "ramp_time": 300,
             "step": "ramp_temp",
-            "target_temp": 50
+            "target_temp": 75,
+            "ramp_time": 0,
+            "hold_time": 60
         },
         {
-            "hold_time": 600,
-            "ramp_time": 600,
+            "hold_time": 180,
+            "ramp_time": 5,
             "step": "ramp_temp",
             "target_temp": 100
         }

@@ -23,8 +23,8 @@ class SafetyMonitor:
 
     def __init__(self, press_id: int):
         self.press_id = press_id
-        self.max_temperature = 350.0  # °C
-        self.thermocouple_error_value = 0.0  # T <= 0 → обрыв
+        self.max_temperature = 250.0  # °C
+        self.thermocouple_error_value = -10.0  # T <= 0 → обрыв
 
         # Загружаем конфигурацию безопасности из hardware_config.json
         try:
@@ -52,11 +52,9 @@ class SafetyMonitor:
             inp = self.press_config["safety_inputs"][name]
             bit = inp["bit"]
             value = state.read_digital(inp["module"])
-            #print("SM inp = "+ str(inp)+" name="+ name+" bit="+ str(bit)+" val= "+ str(value))
             if value is None:
                 return False
             is_set = bool(value & (1 << bit))
-            #print("SM is_set = " + str(is_set))
             if inp["type"] == "active_low":
                 return not is_set  # 0 = активен
             else:  # active_high
@@ -98,14 +96,6 @@ class SafetyMonitor:
             # 🔥 Аварийно выключаем нагрев
             if hasattr(self, 'temp_control'):
                 self.temp_control.cool_all()
-            return False
-
-        if self._read_input("door_closed"):
-            logging.warning(f"SM Пресс-{self.press_id}: ДВЕРЬ ОТКРЫТА!")
-            return False
-
-        if self._read_input("press_closed"):
-            logging.warning(f"SM Пресс-{self.press_id}: ПРЕСС НЕ ЗАКРЫТ!")
             return False
 
         # 2. Проверка температуры

@@ -136,25 +136,27 @@
         <h1>🔧 Настройка ПИД-регуляторов</h1>
         <a href="/" class="btn-back">← Назад</a>
         <div class="tabs">
-            <button class="tab active" data-tab="press1">Пресс 1</button>
-            <button class="tab" data-tab="press2">Пресс 2</button>
-            <button class="tab" data-tab="press3">Пресс 3</button>
+            <button class="tab active" data-tab="press1">Пресс 2</button>
+            <button class="tab" data-tab="press2">Пресс 3</button>
+            <button class="tab" data-tab="press3">Пресс 4</button>
         </div>
 
         <!-- Пресс 1 -->
         <div id="press1" class="form-section active">
-            <h3>Параметры нагрева (зоны 1–8)</h3>
+            <h3>Параметры нагрева (зоны 1–7)</h3>
             <div id="zones1"></div>
             <div class="time-summary">Каждая зона: Kp, Ki, Kd, Оффсет</div>
 
             <h3>Параметры давления</h3>
             <div class="step">
                 <label>Kp</label>
-                <input type="number" id="p1_press_kp" step="0.1" value="1.2">
+                <input type="number" id="p1_press_kp" step="0.1" value="1.2" onchange="updatePressure(1, 'Kp', this.value)">
                 <label>Ki</label>
-                <input type="number" id="p1_press_ki" step="0.01" value="0.05">
+                <input type="number" id="p1_press_ki" step="0.01" value="0.05" onchange="updatePressure(1, 'Ki', this.value)">
                 <label>Kd</label>
-                <input type="number" id="p1_press_kd" step="0.1" value="0.4">
+                <input type="number" id="p1_press_kd" step="0.1" value="0.4" onchange="updatePressure(1, 'Kd', this.value)">
+                <label>Смещение</label>
+                <input type="number" id="p1_press_offset" step="0.1" value="0.4" onchange="updatePressure(1, 'offset', this.value)">
             </div>
 
             <div class="actions">
@@ -166,18 +168,20 @@
 
         <!-- Пресс 2 -->
         <div id="press2" class="form-section">
-            <h3>Параметры нагрева (зоны 1–8)</h3>
+            <h3>Параметры нагрева (зоны 1–7)</h3>
             <div id="zones2"></div>
             <div class="time-summary">Каждая зона: Kp, Ki, Kd, Оффсет</div>
 
             <h3>Параметры давления</h3>
             <div class="step">
                 <label>Kp</label>
-                <input type="number" id="p2_press_kp" step="0.1" value="1.2">
+                <input type="number" id="p2_press_kp" step="0.1" value="1.2" onchange="updatePressure(2, 'Kp', this.value)">
                 <label>Ki</label>
-                <input type="number" id="p2_press_ki" step="0.01" value="0.05">
+                <input type="number" id="p2_press_ki" step="0.01" value="0.05" onchange="updatePressure(2, 'Ki', this.value)">
                 <label>Kd</label>
-                <input type="number" id="p2_press_kd" step="0.1" value="0.4">
+                <input type="number" id="p2_press_kd" step="0.1" value="0.4" onchange="updatePressure(2, 'Kd', this.value)">
+                <label>Смещение</label>
+                <input type="number" id="p2_press_offset" step="0.1" value="0.4" onchange="updatePressure(2, 'offset', this.value)">
             </div>
 
             <div class="actions">
@@ -189,18 +193,20 @@
 
         <!-- Пресс 3 -->
         <div id="press3" class="form-section">
-            <h3>Параметры нагрева (зоны 1–8)</h3>
+            <h3>Параметры нагрева (зоны 1–7)</h3>
             <div id="zones3"></div>
             <div class="time-summary">Каждая зона: Kp, Ki, Kd, Оффсет</div>
 
             <h3>Параметры давления</h3>
             <div class="step">
                 <label>Kp</label>
-                <input type="number" id="p3_press_kp" step="0.1" value="1.2">
+                <input type="number" id="p3_press_kp" step="0.1" value="1.2" onchange="updatePressure(3, 'Kp', this.value)">
                 <label>Ki</label>
-                <input type="number" id="p3_press_ki" step="0.01" value="0.05">
+                <input type="number" id="p3_press_ki" step="0.01" value="0.05" onchange="updatePressure(3, 'Ki', this.value)">
                 <label>Kd</label>
-                <input type="number" id="p3_press_kd" step="0.1" value="0.4">
+                <input type="number" id="p3_press_kd" step="0.1" value="0.4" onchange="updatePressure(3, 'Kd', this.value)">
+                <label>Смещение</label>
+                <input type="number" id="p3_press_offset" step="0.1" value="0.4" onchange="updatePressure(3, 'offset', this.value)">
             </div>
 
             <div class="actions">
@@ -213,9 +219,9 @@
 
     <script>
         const config = {
-            press1: { zones: [], pressure_pid: {} },
-            press2: { zones: [], pressure_pid: {} },
-            press3: { zones: [], pressure_pid: {} }
+            press1: { zones: [], pwm_period: null, pressure_pid: {} },
+            press2: { zones: [], pwm_period: null, pressure_pid: {} },
+            press3: { zones: [], pwm_period: null, pressure_pid: {} }
         };
 
         // Загрузка текущих значений
@@ -225,6 +231,7 @@
                 for (let pid = 1; pid <= 3; pid++) {
                     const press = data.presses[pid - 1];
                     config[`press${pid}`].zones = press.zones;
+                    config[`press${pid}`].pwm_period = press.pwm_period ?? 10.0;  // дефолт
                     config[`press${pid}`].pressure_pid = press.pressure_pid;
                 }
                 renderAll();
@@ -237,7 +244,16 @@
                 document.getElementById(`p${pid}_press_kp`).value = p.Kp;
                 document.getElementById(`p${pid}_press_ki`).value = p.Ki;
                 document.getElementById(`p${pid}_press_kd`).value = p.Kd;
+                document.getElementById(`p${pid}_press_offset`).value = p.offset;
+
             }
+        }
+
+
+        function updatePressure(pid, param, value) {
+            const val = parseFloat(value);
+            if (isNaN(val)) return;
+            config[`press${pid}`].pressure_pid[param] = val;
         }
 
         function renderZones(pid) {
@@ -256,6 +272,8 @@
                     <input type="number" placeholder="Kd" value="${zone.Kd}" step="0.1" onchange="updateZone(${pid}, ${i}, 'Kd', this.value)">
                     <label>Оффсет</label>
                     <input type="number" placeholder="Оффсет" value="${zone.offset}" step="0.1" onchange="updateZone(${pid}, ${i}, 'offset', this.value)">
+                    <label>Mul</label>
+                    <input type="number" placeholder="Mul" value="${zone.mul}" step="0.1" onchange="updateZone(${pid}, ${i}, 'mul', this.value)">
                 `;
                 container.appendChild(div);
             });
@@ -272,32 +290,32 @@
                 // Формируем полную структуру с id
                 const data = {
                     presses: [
-                        { id: 1, zones: config.press1.zones, pressure_pid: config.press1.pressure_pid },
-                        { id: 2, zones: config.press2.zones, pressure_pid: config.press2.pressure_pid },
-                        { id: 3, zones: config.press3.zones, pressure_pid: config.press3.pressure_pid }
+                        { id: 1, pwm_period: config.press1.pwm_period, zones: config.press1.zones, pressure_pid: config.press1.pressure_pid },
+                        { id: 2, pwm_period: config.press2.pwm_period, zones: config.press2.zones, pressure_pid: config.press2.pressure_pid },
+                        { id: 3, pwm_period: config.press3.pwm_period, zones: config.press3.zones, pressure_pid: config.press3.pressure_pid }
                     ]
                 };
             fetch('/save_pid_config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            }).then(() => alert(`✅ ПИД-параметры пресса-${pressId} сохранены`));
+            }).then(() => alert(`✅ ПИД-параметры пресса-${pressId+1} сохранены`));
         }
 
         function saveAsCurrent(pressId) {
             // Формируем полную структуру с id
                 const data = {
                     presses: [
-                        { id: 1, zones: config.press1.zones, pressure_pid: config.press1.pressure_pid },
-                        { id: 2, zones: config.press2.zones, pressure_pid: config.press2.pressure_pid },
-                        { id: 3, zones: config.press3.zones, pressure_pid: config.press3.pressure_pid }
+                        { id: 1, pwm_period: config.press1.pwm_period, zones: config.press1.zones, pressure_pid: config.press1.pressure_pid },
+                        { id: 2, pwm_period: config.press2.pwm_period, zones: config.press2.zones, pressure_pid: config.press2.pressure_pid },
+                        { id: 3, pwm_period: config.press3.pwm_period, zones: config.press3.zones, pressure_pid: config.press3.pressure_pid }
                     ]
                 };
             const blob = new Blob([JSON.stringify(data, null, 4)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `pid_config_press${pressId}.json`;
+            a.download = `pid_config_press${pressId+1}.json`;
             a.click();
         }
 

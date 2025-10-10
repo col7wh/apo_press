@@ -6,6 +6,7 @@ import logging
 import threading
 import os
 import atexit
+import argparse  # <-- Добавь в начало файла
 from typing import Dict, Any
 
 from core.graph_transmitter import GraphTransmitter
@@ -15,7 +16,6 @@ from core.web_interface import WebInterface
 from core.control_manager import ControlManager
 from core.global_state import state
 from logging.handlers import TimedRotatingFileHandler
-
 
 # Глобальные переменные
 hardware_interface: HardwareInterface = None
@@ -37,7 +37,7 @@ def setup_main_logger():
         encoding="utf-8"
     )
     handler.suffix = "%Y-%m-%d"  # app.log.2025-09-01
-    handler.extMatch = r"\d{4}-\d{2}-\d{2}"  # Как распознавать старые
+    # handler.extMatch = r"\d{4}-\d{2}-\d{2}"  # Как распознавать старые
 
     formatter = logging.Formatter('%(asctime)s [MAIN] %(levelname)s: %(message)s')
     handler.setFormatter(formatter)
@@ -49,7 +49,7 @@ def setup_main_logger():
     # Убедимся, что нет дублирующих хендлеров
     if not logging.getLogger().hasHandlers():
         logging.getLogger().addHandler(handler)
-    logging.info("="*50)
+    logging.info("][ " * 35)
     logging.info("M Логирование инициализировано")
 
 
@@ -82,31 +82,30 @@ def start_press(press_id: int):
         return
     cm = control_managers.get(press_id)
     if cm:
-        cm._on_start_pressed()
+        cm.on_start_pressed()
     else:
-        logging.warning(f"M ControlManager для пресса {press_id} не найден")
+        logging.warning(f"M ControlManager для пресса {press_id + 1} не найден")
 
 
 def stop_press(press_id: int, emergency: bool = False):
     cm = control_managers.get(press_id)
     if not cm:
-        logging.info(f"M Пресс-{press_id} не запущен.")
+        logging.info(f"M Пресс-{press_id + 1} не запущен.")
         return
 
     if emergency:
+        cm.emergency_stop()
         if cm.press_controller and cm.press_controller.running:
             cm.press_controller.emergency_stop()
-        logging.warning(f"M Пресс-{press_id}: аварийная остановка!")
     else:
-        cm._on_stop_pressed()
-        logging.info(f"M Пресс-{press_id}: останов по запросу.")
+        cm.stop_cycle()
+        logging.info(f"M Пресс-{press_id + 1}: останов по запросу GUI.")
 
 
 def show_status():
     print("\n" + "=" * 50)
     for pid in range(1, 4):
         # Читаем из state — единая точка истины
-        running = state.get(f"press_{pid}_running", False)
         paused = state.get(f"press_{pid}_paused", False)
         completed = state.get(f"press_{pid}_completed", False)
 
@@ -119,12 +118,12 @@ def show_status():
 
         if running:
             status = "ПАУЗА" if paused else "РАБОТАЕТ"
-            print(f"Пресс-{pid}: {status} | Шаг {current_step}")
+            print(f"Пресс-{pid + 1}: {status} | Шаг {current_step}")
         else:
             if completed:
-                print(f"Пресс-{pid}: ЗАВЕРШЁН")
+                print(f"Пресс-{pid + 1}: ЗАВЕРШЁН")
             else:
-                print(f"Пресс-{pid}: ОСТАНОВЛЕН")
+                print(f"Пресс-{pid + 1}: ОСТАНОВЛЕН")
     print("=" * 50)
 
 
@@ -140,11 +139,11 @@ def show_programs():
                 temp_steps = len(prog.get("temp_program", []))
                 press_steps = len(prog.get("pressure_program", []))
                 total = temp_steps + press_steps
-                print(f"  Пресс {pid}: {total} шагов (T:{temp_steps}, P:{press_steps})")
+                print(f"  Пресс {pid + 1}: {total} шагов (T:{temp_steps}, P:{press_steps})")
             except Exception as e:
-                print(f"  Пресс {pid}: ❌ ошибка загрузки ({e})")
+                print(f"  Пресс {pid + 1}: ❌ ошибка загрузки ({e})")
         else:
-            print(f"  Пресс {pid}: ❌ файл не найден")
+            print(f"  Пресс {pid + 1}: ❌ файл не найден")
 
 
 def command_loop():
@@ -154,12 +153,12 @@ def command_loop():
         print("\n" + "=" * 50)
         print("🔧 УПРАВЛЕНИЕ ПРЕССАМИ")
         print("=" * 50)
-        print("1 — Запустить пресс 1")
-        print("2 — Запустить пресс 2")
-        print("3 — Запустить пресс 3")
-        print("4 — Остановить пресс 1")
-        print("5 — Остановить пресс 2")
-        print("6 — Остановить пресс 3")
+        print("1 — Запустить пресс 2")
+        print("2 — Запустить пресс 3")
+        print("3 — Запустить пресс ")
+        print("4 — Остановить пресс 2")
+        print("5 — Остановить пресс 3")
+        print("6 — Остановить пресс 4")
         print("7 — Аварийная остановка всех")
         print("8 — Показать программы")
         print("9 — Показать статус")
@@ -190,7 +189,7 @@ def command_loop():
                     if cm and cm.press_controller and cm.press_controller.running:
                         cm.press_controller.emergency_stop()
                         cm.press_controller.join(timeout=0.5)
-                        logging.info(f"M Пресс-{pid}: emergency_stop вызван через ControlManager")
+                        logging.info(f"M Пресс-{pid + 1}: emergency_stop вызван через ControlManager")
 
                 for mod in ["31", "32", "34", "35", "36"]:
                     state.write_do(mod, 0, 0)
@@ -207,6 +206,13 @@ def command_loop():
                 show_programs()
             elif cmd == "9":
                 show_status()
+            elif cmd == "11":
+                if state.get(f"press_drawing", False):
+                    state.set(f"press_drawing", False)
+                    print("Рисование выключено")
+                else:
+                    state.set(f"press_drawing", True)
+                    print("Рисование включено")
             elif cmd == "33":
                 print("ВСЁ состояние системы:")
                 print_structured_state()
@@ -216,6 +222,16 @@ def command_loop():
             elif cmd == "35":
                 print("ВСЁ состояние системы:")
                 print_structured_state_full()
+            elif cmd == "44":
+                print("PID:")
+                for pid in [1, 2, 3]:
+                    c = []
+                    for zone in range(8):
+                        c.append(f"|zone {zone}:")
+                        c.append(state.get(f"press_{pid}_temp{zone}_pid", "NaN"))
+                    c.append(f"|pressure ")
+                    c.append(state.get(f"press_{pid}_valve_pid", "NaN"))
+                    print(f"Press {pid} {c}")
             elif cmd == "d" or cmd == "10":
                 print("\n🔧 Запуск диагностики оборудования...")
                 try:
@@ -280,7 +296,7 @@ def print_structured_state():
         temps = state.get(f"press_{pid}_temps", [None] * 8)
         target = state.get(f"press_{pid}_target_temp", "N/A")
         status_temp = state.get(f"press_{pid}_step_status_temperature", "stopped")
-        print(f"  Пресс-{pid}: {temps[:7]} | Уставка: {target}°C | Статус: {status_temp}")
+        print(f"  Пресс-{pid + 1}: {temps[:7]} | Уставка: {target}°C | Статус: {status_temp}")
 
     # --- ДАВЛЕНИЕ ---
     print("\n⚙️  ДАВЛЕНИЕ")
@@ -288,7 +304,7 @@ def print_structured_state():
         pressure = state.get(f"press_{pid}_pressure", "N/A")
         target = state.get(f"press_{pid}_target_pressure", "N/A")
         status_press = state.get(f"press_{pid}_step_status_pressure", "stopped")
-        print(f"  Пресс-{pid}: {pressure} МПа → {target} МПа | Статус: {status_press}")
+        print(f"  Пресс-{pid + 1}: {pressure} МПа → {target} МПа | Статус: {status_press}")
 
     # --- ВЫХОДЫ (DO) ---
     print("\n🔌 ВЫХОДЫ (DO)")
@@ -302,7 +318,7 @@ def print_structured_state():
         temp_step = state.get(f"press_{pid}_current_step_temperature", {})
         press_step = state.get(f"press_{pid}_current_step_pressure", {})
         if temp_step or press_step:
-            print(f"  Пресс-{pid}:")
+            print(f"  Пресс-{pid + 1}:")
             if temp_step:
                 print(
                     f"    Темп:  {temp_step.get('index', '-')} | {temp_step.get('type', '-')} | Цель: {temp_step.get('target_temp', 'N/A')}°C")
@@ -325,10 +341,9 @@ def print_structured_state_full():
         if not any(k.startswith(f"press_{pid}_") for k in data):
             continue
 
-        print(f"\n🔧 ПРЕСС-{pid}")
+        print(f"\n🔧 ПРЕСС-{pid + 1}")
 
         # Статус
-        running = data.get(f"press_{pid}_running", False)
         paused = data.get(f"press_{pid}_paused", False)
         completed = data.get(f"press_{pid}_completed", False)
 
@@ -342,7 +357,7 @@ def print_structured_state_full():
         print(f"  Статус: {status}")
 
         # Температура
-        temps = data.get(f"press_{pid}_temps", [None]*8)[:7]
+        temps = data.get(f"press_{pid}_temps", [None] * 8)[:7]
         target_temp = data.get(f"press_{pid}_target_temp", "N/A")
         step_temp = data.get(f"press_{pid}_current_step_temperature", {})
         step_temp_type = step_temp.get("type", "—")
@@ -429,9 +444,15 @@ def emergency_stop_all():
 
 
 def main():
-    global hardware_interface, daemon, hw_config, control_managers  # ✅ Добавь hw_config
-    setup_main_logger()
+    global hardware_interface, daemon, hw_config, control_managers
 
+    # Парсим аргументы
+    parser = argparse.ArgumentParser(description="Управление прессами")
+    parser.add_argument("--gui", action="store_true", help="Запустить с GUI")
+    parser.add_argument("--console", action="store_true", help="Принудительно запустить консольный режим")
+    args = parser.parse_args()
+
+    setup_main_logger()
     config = load_system_config()
     logging.info(f"M Система запущена в режиме: {config['mode']}")
 
@@ -445,35 +466,113 @@ def main():
     daemon.start()
     logging.info("M HardwareDaemon запущен")
     time.sleep(0.1)
-    # show_programs()
-    # После создания hw и daemon
-    # control_managers = {}
+
+    # Запуск ControlManager'ов
     for pid in [1, 2, 3]:
         cm = ControlManager(press_id=pid, config=hw_config)
         cm.start()
         control_managers[pid] = cm
-        # Создаём PressController, но НЕ запускаем
-        # press_controllers[pid] = PressController(press_id=pid, config=hw_config)
 
-    cmd_thread = threading.Thread(target=command_loop, daemon=True)
-    cmd_thread.start()
+    # Выбор режима
+    if args.gui and not args.console:
+        # Запуск GUI (в основном потоке)
+        # Создаём локальные функции после инициализации control_managers
+        def start_press_local(press_id):
+            if press_id < 1 or press_id > 3:
+                logging.warning("M Пресс должен быть 1, 2 или 3.")
+                return
+            cm = control_managers.get(press_id)
+            if cm:
+                cm.on_start_pressed()
+            else:
+                logging.warning(f"M ControlManager для пресса {press_id + 1} не найден")
 
-    # Запуск веб-интерфейса
-    web_ui = WebInterface(host="0.0.0.0", port=5000)
-    web_ui.start()
-    logging.info("M Веб-интерфейс запущен (http://localhost:5000)")
+        def stop_press_local(press_id):
+            stop_press(press_id, emergency=False)
 
-    # Запуск передатчика на график
-    graph_tx = GraphTransmitter()
-    graph_tx.start()
+        def emergency_stop_local():
+            for pid in [1, 2, 3]:
+                stop_press(pid, emergency=True)
 
-    try:
-        while running:
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        logging.info("M Получен сигнал завершения (Ctrl+C).")
-    #finally:
-        #cleanup()
+        try:
+            # Запуск веб-интерфейса и графиков так же
+            web_ui = WebInterface(host="0.0.0.0", port=5000)
+            web_ui.start()
+            logging.info("M Веб-интерфейс запущен (http://localhost:5000)")
+
+            graph_tx = GraphTransmitter()
+            graph_tx.start()
+
+            # Запуск GUI
+            from gui import SimpleGUI
+            time.sleep(0.5)  # Даём системе время на инициализацию
+            gui = SimpleGUI(start_press_local, stop_press_local, emergency_stop_local)
+            gui.run()  # ← блокирует здесь, пока окно не закроют
+        except ImportError as e:
+            logging.error(f"GUI не может быть запущен: {e}")
+            print("Ошибка: не удалось загрузить GUI. Убедитесь, что gui.py на месте.")
+            return
+    else:
+        # Консольный режим — как раньше
+        cmd_thread = threading.Thread(target=command_loop, daemon=True)
+        cmd_thread.start()
+
+        web_ui = WebInterface(host="0.0.0.0", port=5000)
+        web_ui.start()
+        logging.info("M Веб-интерфейс запущен (http://localhost:5000)")
+
+        graph_tx = GraphTransmitter()
+        graph_tx.start()
+
+        try:
+            while running:
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            logging.info("M Получен сигнал завершения (Ctrl+C).")
+
+
+# def main():
+#     global hardware_interface, daemon, hw_config, control_managers  # ✅ Добавь hw_config
+#     setup_main_logger()
+#
+#     config = load_system_config()
+#     logging.info(f"M Система запущена в режиме: {config['mode']}")
+#
+#     hardware_interface = initialize_hardware()
+#
+#     config_path = os.path.join("config", "hardware_config.json")
+#     with open(config_path, "r", encoding="utf-8") as f:
+#         hw_config = json.load(f)
+#
+#     daemon = HardwareDaemon(hardware_interface)
+#     daemon.start()
+#     logging.info("M HardwareDaemon запущен")
+#     time.sleep(0.1)
+#
+#     for pid in [1, 2, 3]:
+#         cm = ControlManager(press_id=pid, config=hw_config)
+#         cm.start()
+#         control_managers[pid] = cm
+#
+#     cmd_thread = threading.Thread(target=command_loop, daemon=True)
+#     cmd_thread.start()
+#
+#     # Запуск веб-интерфейса
+#     web_ui = WebInterface(host="0.0.0.0", port=5000)
+#     web_ui.start()
+#     logging.info("M Веб-интерфейс запущен (http://localhost:5000)")
+#
+#     # Запуск передатчика на график
+#     graph_tx = GraphTransmitter()
+#     graph_tx.start()
+#
+#     try:
+#         while running:
+#             time.sleep(0.1)
+#     except KeyboardInterrupt:
+#         logging.info("M Получен сигнал завершения (Ctrl+C).")
+#     #finally:
+#         #cleanup()
 
 
 if __name__ == "__main__":

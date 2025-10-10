@@ -120,6 +120,28 @@
     .stopped { background: #e53935; color: white; }
     .paused { background: #fb8c00; color: white; }
 
+    /* Температуры и зоны — вместе, по центру, в одну строку */
+    .temp-zone-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 6px 0;
+      gap: 4px;
+    }
+
+    .temps {
+      font-family: 'Courier New', monospace;
+      font-size: 1.0em;
+      text-align: center;
+      color: #86f664;
+      font-weight: 500;
+      letter-spacing: -0.6px;
+      width: 100%;
+      white-space: nowrap;
+      overflow: visible;
+      text-overflow: ellipsis;
+    }
+
     .zones {
       display: flex;
       gap: 8px;
@@ -137,57 +159,11 @@
       min-width: 26px;
     }
 
-    .zone-list {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      margin: 6px 0;
-      padding: 0 4px;
-    }
-
-    .zone-row {
-      display: grid;
-      grid-template-columns: 20px 50px 50px 20px;
-      gap: 6px;
-      justify-items: center;
-      font-size: 0.9em;
-    }
-
-    .zone-num {
-      font-size: 1.5em;
-      min-width: 16px;
-      text-align: center;
-      font-weight: bold;
-      color: #bbb;
-    }
-
-    .zone-label {
-      font-size: 0.8em;
-      color: #bbb;
-      font-weight: 500;
-    }
-
-    .temp-value {
-      font-size: 1.5em;
-      min-width: 48px;
-      text-align: center;
-      color: #86f664;
-      font-weight: 500;
-    }
-
-    .deviation {
-      font-size: 1.5em;
-      min-width: 48px;
-      text-align: center;
-      color: #ffa726;
-      font-weight: 500;
-    }
-
     .lamp {
-      width: 22px;
-      height: 22px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
-      margin: 5px auto 1px;
+      margin: 0 auto 1px;
       border: 1px solid #555;
     }
 
@@ -344,10 +320,8 @@
             statusText = "Работает";
           }
 
-          const stepType_t = formatStepType(p.current_step.type_t);
-          const stepType_p = formatStepType(p.current_step.type_p);
-          const index_t = typeof p.current_step.index_t === 'number' ? p.current_step.index_t + 1 : '–';
-          const index_p = typeof p.current_step.index_p === 'number' ? p.current_step.index_p + 1 : '–';
+          const stepType = formatStepType(p.current_step.type);
+          const index = typeof p.current_step.index === 'number' ? p.current_step.index + 1 : '–';
           const type = stepLabels[p.current_step.type] || p.current_step.type;
           const elapsed = p.current_step.elapsed || 0;
           const duration = p.current_step.duration === "∞" || p.current_step.duration == null ? "∞" : p.current_step.duration;
@@ -355,59 +329,43 @@
           const step_time_press = p.current_step.step_time_press || 0;
           const step_duration_temp = p.current_step.step_duration_temp || 0;
           const step_duration_press = p.current_step.step_duration_press || 0;
-          const pid_str = p.c || 0;
+          const pid_str =  p.c || 0;
 
           html += `
           <div class="press">
             <div class="header">
               <span>Пресс ${p.id+1}</span>
-              <span>Деталь ${p.p_name}</span>
               <span class="status ${statusClass}">${statusText}</span>
             </div>
 
-            <div class="zone-list">
-              ${p.temps.slice(0,7).map((t, i) => {
-                const target = p.temp_target !== null ? parseFloat(p.temp_target) : null;
-                const tempDisplay = t !== null ? t.toFixed(1) : 'N/A';
-                let deviationDisplay;
-
-                if (t === null || target === null) {
-                  deviationDisplay = '0.0';
-                } else {
-                  const dev = parseFloat(t) - target;
-                  deviationDisplay = dev >= 0 ? '+' + dev.toFixed(1) : dev.toFixed(1);
-                }
-
-                return `
-                  <div class="zone-row">
-                    <div class="zone-num">${i+1}</div>
-                    <div class="temp-value">${tempDisplay}</div>
-                    <div class="deviation">${deviationDisplay}</div>
-                    <div class="lamp ${p.heating_bits[i] ? 'on' : 'off'}"></div>
+            <!-- Температуры и зоны — вместе, по центру -->
+            <div class="temp-zone-container">
+              <div class="temps">
+                ${p.temps.slice(0,7).map(t => t !== null ? t.toFixed(1) : 'N/A').join(' | ')}
+              </div>
+              <div class="zones">
+                ${p.heating_bits.slice(0,7).map((on, i) => `
+                  <div class="zone">
+                    <div class="lamp ${on ? 'on' : 'off'}"></div>
+                    <div>${i+1}</div>
                   </div>
-                `;
-              }).join('')}
+                `).join('')}
+              </div>
             </div>
 
             <!-- Основная информация -->
             <div class="info-row">
-              <span>Статус: ${statusText}</span>
-              <span>Шаг: ${index_t}. ${stepType_t} / ${index_p}. ${stepType_p} </span>
-              <span>Время общее ${formatMinSec(elapsed)} ${duration !== "∞" ? "/" + formatMinSec(duration) : ""} мин.с</span>
+              <span>Статус: ${p.current_step.status}</span>
+              <span>Время общее ${formatMinSec(elapsed)}/${duration !== "∞" ? "/" + formatMinSec(duration) : ""} мин.с</span>
             </div>
             <div class="info-row">
-
+              <span>Темп Уст: ${tempTarget}°C | Время: ${formatMinSec(step_time_temp)}/${formatMinSec(step_duration_temp)} мин.с</span>
             </div>
             <div class="info-row">
-              <span>Темп Уст: ${tempTarget}°C</span>
-              <span>Время: ${formatMinSec(step_time_temp)}/${formatMinSec(step_duration_temp)} мин.с</span>
+              <span>Шаг: ${index}. ${type}</span>
             </div>
             <div class="info-row">
-
-            </div>
-            <div class="info-row">
-              <span>Давл Изм|Уст: ${pressure}/${pressureTarget} МПа</span>
-              <span>Время: ${formatMinSec(step_time_press)}/${formatMinSec(step_duration_press)} мин.с</span>
+              <span>Давл Изм|Уст: ${pressure}/${pressureTarget} МПа | Время: ${formatMinSec(step_time_press)}/${formatMinSec(step_duration_press)} мин.с</span>
             </div>
 
 

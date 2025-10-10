@@ -4,14 +4,15 @@
 Управляет 8 зонами нагрева независимо.
 Работает через global_state (шина команд).
 """
-import os
 import json
-import time
 import logging
+import os
 import sys
 import threading
-from typing import Optional, List, Dict
-from core.global_state import state  # ✅ Используем шину
+import time
+from typing import Optional, List
+
+from core.global_state import state
 from core.pid_controller import PIDController
 
 # Убедимся, что корень проекта в пути
@@ -22,19 +23,18 @@ if project_root not in sys.path:
 
 
 class TemperatureController(threading.Thread):
-    def __init__(self, press_id):
+    def __init__(self, id_press: int):
         super().__init__(daemon=True)
-        self.press_id = press_id
+        self._pwm_start = {}
+        self.press_id = id_press
         self.running = True
 
         self.config_path = os.path.join("config", "hardware_config.json")
         with open(self.config_path, "r", encoding="utf-8") as f:
             self.config = json.load(f)
 
-        self.hysteresis = 2.0
-
         # Загружаем конфиг пресса
-        press_cfg = self.config["presses"][press_id - 1]
+        press_cfg = self.config["presses"][id_press - 1]
         self.ai_module = press_cfg["modules"]["ai"]
         self.do_module = press_cfg["modules"]["do"]
         self.heater_channels = press_cfg["heater_channels"]  # [0,1,2,3,4,5,6,7] или [8,9,...]
@@ -44,19 +44,21 @@ class TemperatureController(threading.Thread):
         self.enabled = [True] * self.zones
         self.heating = [False] * self.zones
 
-        logging.info(f"TC Пресс-{press_id}: TemperatureController инициализирован. Модуль {self.do_module}")
+        logging.info(f"TC Пресс-{id_press+ 1}: TemperatureController инициализирован. Модуль {self.do_module}")
 
         # Загрузка конфига
         self.pids = []
         self.offsets = []
+        self.pwm_period = 10.0
         self.load_config(self.press_id)
 
-    def load_config(self, id: int):
+    def load_config_(self, id_press: int):
         self.pids = []
         self.offsets = []
         # Загрузка конфига
         with open("config/pid_config.json", "r") as f:
-            pid_cfg = json.load(f)["presses"][id - 1]
+            pid_cfg = json.load(f)["presses"][id_press - 1]
+
 
         for zone_cfg in pid_cfg["zones"]:
             pid = PIDController(
@@ -66,102 +68,60 @@ class TemperatureController(threading.Thread):
                 output_limits=(0, 100)  # % включения
             )
             self.pids.append(pid)
-            self.offsets.append(zone_cfg["offset"])
 
-    def set_target(self, zone: int, temp: float):
-        """Установить уставку для зоны (0–7)"""
-        if 0 <= zone < self.zones:
-            self.targets[zone] = temp
-            self.enabled[zone] = True
-            logging.info(f"TC Пресс-{self.press_id}, зона {zone + 1}: уставка = {temp}°C")
-        else:
-            logging.error(f"TC Пресс-{self.press_id}: некорректная зона: {zone}")
+    def load_config(self, id_press: int):
+        """Загружает конфиг и обновляет коэффициенты ПИД без сброса состояния"""
+        try:
+            with open("config/pid_config.json", "r") as f:
+                pid_cfg = json.load(f)["presses"][id_press - 1]
 
-    def set_target_all(self, temp: float):
-        """Установить уставку для всех зон"""
-        for zone in range(self.zones):
-            self.targets[zone] = temp
-            self.enabled[zone] = True
-        logging.info(f"TC Пресс-{self.press_id}: уставка {temp}°C установлена для всех зон")
+            self.pwm_period = pid_cfg["pwm_period"]
 
-    def disable_zone(self, zone: int):
-        """Отключить зону (например, при обрыве термопары)"""
-        if 0 <= zone < self.zones:
-            self.enabled[zone] = False
-            self.targets[zone] = None
-            self._update_do_output()  # Обновляем DO
-            logging.warning(f"TC Пресс-{self.press_id}, зона {zone + 1}: отключена")
-        else:
-            logging.error(f"TC Пресс-{self.press_id}: некорректная зона: {zone}")
+            # Обновляем коэффициенты существующих PID
+            for i, zone_cfg in enumerate(pid_cfg["zones"]):
+                if i < len(self.pids):
+                    self.pids[i].set_tunings(
+                        Kp=zone_cfg["Kp"],
+                        Ki=zone_cfg["Ki"],
+                        Kd=zone_cfg["Kd"]
+                    )
+                else:
+                    # Если зон больше — добавляем новые PID
+                    pid = PIDController(
+                        Kp=zone_cfg["Kp"],
+                        Ki=zone_cfg["Ki"],
+                        Kd=zone_cfg["Kd"],
+                        output_limits=(0, 100)
+                    )
+                    self.pids.append(pid)
+
+            # Обновляем оффсеты
+            self.offsets = [zone["offset"] for zone in pid_cfg["zones"]]
+
+            logging.debug(f"TC Пресс-{id_press + 1}: ПИД-коэффициенты обновлены на лету")
+
+        except Exception as e:
+            logging.error(f"TC Пресс-{id_press + 1}: ошибка загрузки PID-конфига: {e}")
 
     def read_all_temperatures(self) -> List[Optional[float]]:
         """Чтение всех 8 температур из global_state (шины)"""
         try:
             temps = state.read_ai(self.press_id)  # ✅ Читаем через шину
             if not temps or len(temps) < 7:
-                logging.warning(f"TC Пресс-{self.press_id}: недостаточно данных температур")
+                logging.warning(f"TC Пресс-{self.press_id+ 1}: недостаточно данных температур")
                 return [None] * 7
             return temps
         except Exception as e:
-            logging.error(f"TC Пресс-{self.press_id}: ошибка чтения температур: {e}")
+            logging.error(f"TC Пресс-{self.press_id+ 1}: ошибка чтения температур: {e}")
             return [None] * 7
 
     def _update_do_output(self):
         """Обновляет DO, включая/выключая нужные каналы"""
-        for zone in range(self.zones):
-            ch = self.heater_channels[zone]  # Правильный бит на DO-модуле
-            desired = self.heating[zone]
+        for c_zone in range(self.zones):
+            ch = self.heater_channels[c_zone]  # Правильный бит на DO-модуле
+            desired = self.heating[c_zone]
             print(f"TC heat {self.do_module}, {ch}, {desired}")
             state.write_do_bit(self.do_module, ch, desired)
-
-    def _read_do_state(self) -> int:
-        """Читает текущее состояние DO из global_state"""
-        try:
-            value = state.read_digital(self.do_module)
-            return value if value is not None else 0
-        except Exception as e:
-            logging.error(f"TC Пресс-{self.press_id}: ошибка чтения DO: {e}")
-            return 0
-
-    def heat_to_(self, zones: List[int] = None) -> bool:
-        """
-        Упрощённый режим: нагрев до температуры.
-        Возвращает True, когда все зоны достигли цели (с гистерезисом).
-        """
-        target_temp = state.get(f"press_{self.press_id}_target_temp", None)
-        logging.info(f"TC Пресс-{self.press_id}, нагрев до температуры {target_temp}:")
-        if zones is None:
-            zones = list(range(self.zones))  # Все зоны
-
-        # Устанавливаем уставку
-        for zone in zones:
-            if self.enabled[zone]:
-                self.targets[zone] = target_temp
-
-        # Читаем температуры
-        temps = self.read_all_temperatures()
-
-        # Проверяем, достигнута ли цель
-        all_reached = True
-        for zone in zones:
-            if not self.enabled[zone]:
-                continue
-            temp = temps[zone]
-            if temp is None:
-                all_reached = False
-                continue
-            # Достигли, если temp >= target - hysteresis
-            if temp < target_temp - self.hysteresis:
-                all_reached = False
-        logging.info(f"TC Пресс-{self.press_id}, все зоны достигли {all_reached}:")
-        return all_reached
-
-    def heat_to(self, target_temp: float):
-        """Запуск нагрева — как защёлка"""
-        state.set(f"press_{self.press_id}_target_temp", target_temp)
-        self.running = True
-        if not self.is_alive():
-            self.start()
 
     def cool_all(self):
         self.running = False
@@ -171,10 +131,20 @@ class TemperatureController(threading.Thread):
             state.set_do_command(self.do_module, 0, 0, urgent=False)
 
     def run(self):
-        logging.info(f"TC Пресс-{self.press_id}: поток нагрева запущен")
+        logging.info(f"TC Пресс-{self.press_id+ 1}: поток нагрева запущен")
+        last_mod = 0
         while self.running:
+
+            config_path = "config/pid_config.json"
+            try:
+                mod_time = os.path.getmtime(config_path)
+                if mod_time > last_mod:
+                    self.load_config(self.press_id)
+                    last_mod = mod_time
+            except OSError:
+                pass
+
             self.update()
-            self.load_config(self.press_id)
             time.sleep(0.1)
 
     def update(self):
@@ -193,7 +163,7 @@ class TemperatureController(threading.Thread):
                 low = new_state & 0xFF
                 high = (new_state >> 8) & 0xFF
                 state.set_do_command(self.do_module, low, high, urgent=True)
-                logging.info(f"TC Пресс-{self.press_id}: нагрев выключен (target_temp = None)")
+                logging.info(f"TC Пресс-{self.press_id+1}: нагрев выключен (target_temp = None) ")
                 logging.debug(f"TC Command{self.do_module, low, high}")
             return
 
@@ -205,39 +175,54 @@ class TemperatureController(threading.Thread):
         # Определяем свои биты
         my_channels = self.heater_channels  # [0,1,2,3] для Пресса 1, [4,5,6,7] для Пресса 2
 
-        for zone, ch in enumerate(my_channels):
-            t = temps[zone]
-            if t is None:
+        for cur_zone, ch in enumerate(my_channels):
+            temp_list = temps[cur_zone]
+            if temp_list is None:
                 continue
 
-            # гистерезис
-            # should_heat = t < target_temp - self.hysteresis
-
             # PID
-            # Применяем оффсет
-            temp_with_offset = temps[zone] + self.offsets[zone]
-            self.pids[zone].set_setpoint(target_temp)
+            self.pids[cur_zone].set_setpoint(target_temp)
 
             # Вычисляем выход
-            output = self.pids[zone].compute(temp_with_offset)
+            output = self.pids[cur_zone].compute(temps[cur_zone])
+            state.set(f"press_{self.press_id}_temp{cur_zone}_pid", round(output, 2))
             should_heat = output > 10  # >10% → включаем
 
             mask = 1 << ch
-            if should_heat:
+
+            if output >= 100.0:
+                # 🔥 Всегда включено
                 new_state |= mask
-            else:
+            elif output <= 10.0:
+                # ❌ Всегда выключено
                 new_state &= ~mask
+            else:
+                # 🌀 ШИМ: 10% < output < 100%
+                on_time = (output / 100.0) * self.pwm_period
+                off_time = self.pwm_period - on_time
+
+                # База времени — timestamp зоны
+                if not hasattr(self, '_pwm_start'):
+                    self._pwm_start = {}
+                if cur_zone not in self._pwm_start:
+                    self._pwm_start[cur_zone] = time.time()
+
+                dt = time.time() - self._pwm_start[cur_zone]
+                phase = dt % self.pwm_period
+
+                if phase < on_time:
+                    new_state |= mask  # ON
+                else:
+                    new_state &= ~mask  # OFF
 
         # 🔥 Только если изменилось — отправляем
         if current_state != new_state:
             low = new_state & 0xFF
             high = (new_state >> 8) & 0xFF
             state.set_do_command(self.do_module, low, high, urgent=False)
-            # print(f"TC Пресс-{self.press_id}: DO-{self.do_module} → 0x{new_state:04X} "
-            # f"(было: 0x{current_state:04X}) ишем в gs state.read_digital")
 
     def stop(self):
-        logging.info(f"TC Пресс-{self.press_id}: остановлен")
+        logging.info(f"TC Пресс-{self.press_id+ 1}: остановлен")
         self.running = False
 
 
@@ -299,7 +284,7 @@ if __name__ == "__main__":
 
     # tc = TemperatureController(press_id=press_id, hardware_interface=hw)
     # test
-    tc = TemperatureController(press_id=press_id)
+    tc = TemperatureController(id_press=press_id)
     print(f"\n🔧 Управление нагревом пресса {press_id} запущено")
 
     while True:
@@ -320,7 +305,8 @@ if __name__ == "__main__":
             try:
                 zone = int(input("Зона (1–8): ")) - 1
                 temp = float(input("Уставка (°C): "))
-                tc.set_target(zone, temp)
+                # Need refactor
+                # tc.set_target(zone, temp)
                 input("Нажмите Enter...")
             except:
                 print("Ошибка ввода")
@@ -329,7 +315,7 @@ if __name__ == "__main__":
         elif cmd == "2":
             try:
                 zone = int(input("Зона (1–8): ")) - 1
-                tc.disable_zone(zone)
+                # tc.disable_zone(zone)
                 input("Нажмите Enter...")
             except:
                 print("Ошибка ввода")
@@ -341,13 +327,13 @@ if __name__ == "__main__":
 
         elif cmd == "4":
             temps = tc.read_all_temperatures()
-            status = tc.update()
-            print("\n📊 Статус зон:")
-            for z in range(8):
-                t = temps[z] if temps[z] is not None else "N/A"
-                s = status[z]
-                print(f"  Зона {z + 1}| {s}")
-            input("\nНажмите Enter...")
+            # status = tc.update()
+            # print("\n📊 Статус зон:")
+            # for z in range(8):
+            #     t = temps[z] if temps[z] is not None else "N/A"
+            #     s = status[z]
+            #     print(f"  Зона {z + 1}| {s}")
+            # input("\nНажмите Enter...")
 
         elif cmd == "5":
             print("\n📊 РЕАЛЬНОЕ ВРЕМЯ — Пресс {press_id} (Ctrl+C для выхода)")
@@ -365,14 +351,14 @@ if __name__ == "__main__":
                     temps = tc.read_all_temperatures()
                     status = tc.update()
 
-                    for z in range(8):
-                        t = f"{temps[z]:>4.1f}" if temps[z] is not None else " N/A"
-                        target = f"{status[z]['target']:>5.1f}" if status[z]['target'] is not None else "  N/A"
-                        cmd = " ВКЛ " if status[z]['heating_cmd'] else " ВЫК "
-                        real = " ВКЛ " if status[z]['heating_bit'] else " ВЫК "
-                        stat = f"{status[z]['status']:^7}"
+                    # for z in range(8):
+                    #     t = f"{temps[z]:>4.1f}" if temps[z] is not None else " N/A"
+                    #     target = f"{status[z]['target']:>5.1f}" if status[z]['target'] is not None else "  N/A"
+                    #     cmd = " ВКЛ " if status[z]['heating_cmd'] else " ВЫК "
+                    #     real = " ВКЛ " if status[z]['heating_bit'] else " ВЫК "
+                    #     stat = f"{status[z]['status']:^7}"
 
-                        print(f" {z + 1}  | {t} |  {target} | {cmd} | {real} | {stat}")
+                    # print(f" {z + 1}  | {t} |  {target} | {cmd} | {real} | {stat}")
                     time.sleep(1.0)
 
             except KeyboardInterrupt:
@@ -381,7 +367,7 @@ if __name__ == "__main__":
         elif cmd == "6":
             try:
                 temp = float(input("Введите уставку для всех зон (°C): "))
-                tc.set_target_all(temp)
+                # tc.set_target_all(temp)
                 print(f"✅ Уставка {temp}°C применена ко всем зонам")
                 input("Нажмите Enter, чтобы продолжить...")
             except ValueError:

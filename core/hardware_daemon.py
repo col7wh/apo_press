@@ -3,6 +3,7 @@
 Фоновый демон: единый цикл с очередью команд.
 Если очередь пуста — читаем DI (кнопки, E-Stop).
 """
+import json
 import time
 import logging
 import traceback
@@ -21,9 +22,14 @@ class HardwareDaemon(Thread):
         self.last_ai_time = 0
         self.last_do_time = 0
         self.last_pressure_time = 0
-
+        self.p_config = self._load_config_pid()
+        self.offsets = []
         state.set_hardware_interface(hardware_interface, daemon_mode=True)
         logging.info("HD HardwareDaemon инициализирован")
+
+    def _load_config_pid(self):
+        with open("config/pid_config.json", "r", encoding="utf-8") as f:
+            return json.load(f)
 
     def run(self):
         logging.info("HD HardwareDaemon запущен")
@@ -92,6 +98,7 @@ class HardwareDaemon(Thread):
                     "module": ai_module,
                     "press_id": pid
                 })
+            self.p_config = self._load_config_pid()
             self.last_ai_time = now
 
         if now - self.last_pressure_time >= 0.1:
@@ -123,21 +130,35 @@ class HardwareDaemon(Thread):
                         # Первые 3 значения — давления прессов 1, 2, 3
                         for pid in range(1, 4):
                             if pid <= len(values):
-                                pressure = values[pid - 1]  # values[0], [1], [2]
+                                offset = self.p_config["presses"][pid-1]["pressure_pid"]["offset"]
+                                pressure = values[3 - pid] + float(offset)  # values[0], [1], [2]
+
                                 state.set(f"press_{pid}_pressure", pressure)
-                                #logging.info(f"HD Давление пресса {pid}: {pressure} МПа")
+                                # logging.info(f"HD Давление пресса {pid}: {pressure} МПа")
                     elif "press_id" in cmd:
-                        state.set(f"press_{cmd['press_id']}_temps", values[:8])
-                        #logging.info(f"HD Температуры пресса {cmd['press_id']}: {values[:8]}")
+                        # old method - clear
+                        # state.set(f"press_{cmd['press_id']}_temps", values[:8])
+                        # logging.info(f"HD Температуры пресса {cmd['press_id']}: {values[:8]}")
+                        # new method - offset
+                        p_id = cmd['press_id']
+                        temps = values[:8]  # первые 8 значений температуры
+
+                        # Получаем оффсеты для зон
+                        offsets = [zone["offset"] for zone in self.p_config["presses"][p_id-1]["zones"]]
+                        muls = [zone["mul"] for zone in self.p_config["presses"][p_id-1]["zones"]]
+                        # Применяем оффсеты: temp + offset
+                        mod_values = [(t + off) * mul for t, off, mul in zip(temps, offsets, muls)]
+                        mod_values.append(0)
+                        state.set(f"press_{p_id}_temps", mod_values[:8])
                     else:
                         logging.warning(f"HD Назначение AI-чтения неизвестно: {cmd}")
 
             elif cmd["type"] == "read_do":
                 value = self.hw.read_digital(cmd["module"])
-                #print(f"HD read {cmd['module']} = {value}")
+                # print(f"HD read {cmd['module']} = {value}")
                 if value is not None:
                     state.set(f"do_state_{cmd['module']}", value)
-                    #print(f"HD try read_digital {cmd['module']}, cyr val in state {value}")
+                    # print(f"HD try read_digital {cmd['module']}, cyr val in state {value}")
 
         except Exception as e:
             logging.error(f"HD Ошибка выполнения команды {cmd}: {e}")

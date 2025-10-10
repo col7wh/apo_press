@@ -31,7 +31,7 @@ if not hardware_logger.handlers:
         encoding="utf-8"
     )
     handler.suffix = "%Y-%m-%d"
-    handler.extMatch = r"\d{4}-\d{2}-\d{2}"
+    #handler.extMatch = r"\d{4}-\d{2}-\d{2}"
 
     formatter = logging.Formatter('%(asctime)s [HI] %(levelname)s: %(message)s')
     handler.setFormatter(formatter)

@@ -6,7 +6,7 @@
         "ai": "17",
         "do": "34"
       },
-      "heater_channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "heater_channels": [0, 1, 2, 3, 4, 5, 6],
       "valves": {
         "lift_up": { "module": "32", "bit": 7 },
         "lift_down": { "module": "32", "bit": 8 },
@@ -91,7 +91,7 @@
         "ai": "18",
         "do": "33"
       },
-      "heater_channels": [8, 9, 10, 11, 12, 13, 14, 15] ,
+      "heater_channels": [7, 8, 9, 10, 11, 12, 13] ,
       "valves": {
         "lift_up": { "module": "31", "bit": 14 },
         "lift_down": { "module": "31", "bit": 15 },
@@ -176,7 +176,7 @@
         "ai": "19",
         "do": "33"
       },
-      "heater_channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "heater_channels": [0, 1, 2, 3, 4, 5, 6],
       "valves": {
         "lift_up": { "module": "31", "bit": 5 },
         "lift_down": { "module": "31", "bit": 6 },

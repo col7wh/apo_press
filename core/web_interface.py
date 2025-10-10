@@ -15,6 +15,11 @@ from datetime import datetime
 from flask import Flask, render_template, Response, request, redirect, url_for, jsonify
 from core.global_state import state
 
+import sys
+
+cli = sys.modules['flask.cli']
+cli.show_server_banner = lambda *x: None
+
 
 class WebInterface(threading.Thread):
     def __init__(self, host="0.0.0.0", port=5000):
@@ -28,8 +33,9 @@ class WebInterface(threading.Thread):
 
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         templates_dir = os.path.join(project_root, "templates")
+        static_dir = os.path.join(project_root, "static")
 
-        self.app = Flask(__name__, template_folder=templates_dir)
+        self.app = Flask(__name__, static_folder=static_dir, template_folder=templates_dir)
         self.setup_routes()
 
     def setup_routes(self):
@@ -60,7 +66,7 @@ class WebInterface(threading.Thread):
                             print(f"Error: data in file {file} is not a dictionary.")
                         programs.append(program_data)
 
-            #print(f"Programs loaded: {programs}")  # Печатаем, чтобы проверить данные
+            # print(f"Programs loaded: {programs}")  # Печатаем, чтобы проверить данные
 
             if request.method == "POST":
                 program_name = request.form.get('program_name')
@@ -110,6 +116,7 @@ class WebInterface(threading.Thread):
                 try:
                     with open(f"programs/press{pid}.json", "r", encoding="utf-8") as f:
                         programs[f"press{pid}"] = json.load(f)
+                        # state.set(f"press_{pid}_p_name", programs.get("name", ""))
                 except FileNotFoundError:
                     programs[f"press{pid}"] = {"temp_program": [], "pressure_program": []}
             return jsonify(programs)
@@ -119,6 +126,7 @@ class WebInterface(threading.Thread):
             data = request.get_json()
             for pid in [1, 2, 3]:
                 program = data.get(f"press{pid}")
+                state.set(f"press_{pid}_p_name", program.get("name", ""))
                 if program:
                     with open(f"programs/press{pid}.json", "w", encoding="utf-8") as f:
                         json.dump(program, f, ensure_ascii=False, indent=4)
@@ -130,6 +138,7 @@ class WebInterface(threading.Thread):
             press_id = data.get("press_id")
             program = data.get("program")
             if press_id in [1, 2, 3]:
+                state.set(f"press_{press_id}_p_name", program.get("name", ""))
                 with open(f"programs/press{press_id}.json", "w", encoding="utf-8") as f:
                     json.dump(program, f, ensure_ascii=False, indent=4)
                 return "OK"
@@ -155,6 +164,14 @@ class WebInterface(threading.Thread):
                                 continue
 
                             temps = state.get(f"press_{pid}_temps", [None] * 8)
+                            c = [""]
+                            for zone in range(7):
+                                c.append(f"|zone{zone + 1}:")
+                                c.append(state.get(f"press_{pid}_temp{zone}_pid", "NaN"))
+                                c.append(" ")
+                            c.append(f"|pressure:")
+                            c.append(state.get(f"press_{pid}_valve_pid", "NaN"))
+
                             do_state = state.get(f"do_state_{do_module}", 0)
 
                             heating_bits = [bool(do_state & (1 << ch)) for ch in heater_channels[:7]]
@@ -229,11 +246,13 @@ class WebInterface(threading.Thread):
                             press_step = state.get(f"press_{pid}_current_step_pressure", {})
 
                             current_step = {
-                                "index": temp_step.get("index", press_step.get("index", "-")),
-                                "type": f"{temp_step.get('type', '—')} / {press_step.get('type', '—')}",
+                                "index_t": temp_step.get("index", '—'),
+                                "index_p": press_step.get("index", '—'),
+                                "type_t": f"{temp_step.get('type', '—')}",
+                                "type_p": f"{press_step.get('type', '—')}",
                                 "target_temp": temp_step.get("target_temp", "—"),
                                 "target_pressure": press_step.get("target_pressure", "—"),
-                                "elapsed":  int(state.get(f"press_{pid}_cycle_elapsed", 0.0)),
+                                "elapsed": int(state.get(f"press_{pid}_cycle_elapsed", 0.0)),
                                 "status": state.get(f"press_{pid}_step_status_temperature", "stopped"),
                                 "step_time_temp": int(state.get(f"press_{pid}_step_elapsed_temperature", 0.0)),
                                 "step_time_press": int(state.get(f"press_{pid}_step_elapsed_pressure", 0.0)),
@@ -243,9 +262,9 @@ class WebInterface(threading.Thread):
                                 "step_duration_press": state.get(f"press_{pid}_step_duration_pressure", 0),
                             }
 
-
                             data["presses"].append({
                                 "id": pid,
+                                "c": c,
                                 "temps": [round(float(t), 1) if t not in (None, "N/A") else None for t in temps[:7]],
                                 "heating_bits": heating_bits,
                                 "running": state.get(f"press_{pid}_running", False),
@@ -255,7 +274,9 @@ class WebInterface(threading.Thread):
                                 "inputs": inputs,
                                 "outputs": outputs,
                                 "valve_outputs": valve_outputs,  # ✅ Новый блок
-                                "current_step": current_step
+                                "current_step": current_step,
+                                "p_name": state.get(f"press_{pid}_p_name", "")
+
                             })
 
                         # 🔥 Правильный формат SSE
@@ -270,6 +291,60 @@ class WebInterface(threading.Thread):
                         time.sleep(1)
 
                     time.sleep(1.0)
+
+            return Response(generate(), mimetype="text/event-stream")
+
+        @self.app.route("/stream_g")
+        def stream_g():
+            def generate():
+                while True:
+                    try:
+                        data = {
+                            "timestamp": self._get_timestamp(),
+                            "presses": []
+                        }
+
+                        for pid in range(1, 4):
+                            temps = state.get(f"press_{pid}_temps", [None] * 8)
+
+                            temp_step = state.get(f"press_{pid}_current_step_temperature", {})
+                            press_step = state.get(f"press_{pid}_current_step_pressure", {})
+
+                            current_step = {
+                                "target_temp": temp_step.get("target_temp", "—"),
+                                "target_pressure": press_step.get("target_pressure", "—"),
+                                "elapsed": int(state.get(f"press_{pid}_cycle_elapsed", 0.0)),
+                                "status": state.get(f"press_{pid}_step_status_temperature", "stopped"),
+                                "step_time_temp": int(state.get(f"press_{pid}_step_elapsed_temperature", 0.0)),
+                                "step_time_press": int(state.get(f"press_{pid}_step_elapsed_pressure", 0.0)),
+                                "cycle_time": int(state.get(f"press_{pid}_cycle_elapsed", 0.0)),
+                                "step_duration_temp": state.get(f"press_{pid}_step_duration_temperature", 0),
+                                "step_duration_press": state.get(f"press_{pid}_step_duration_pressure", 0),
+                            }
+
+                            data["presses"].append({
+                                "id": pid,
+                                "temps": [round(float(t), 1) if t not in (None, "N/A") else None for t in temps[:7]],
+                                "pressure": state.get(f"press_{pid}_pressure", None),
+                                "temp_target": state.get(f"press_{pid}_target_temp", None),
+                                "pressure_target": state.get(f"press_{pid}_target_pressure", None),
+                                "current_step": current_step,
+                                "p_name": state.get(f"press_{pid}_p_name", "")
+
+                            })
+
+                        # 🔥 Правильный формат SSE
+                        json_data = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+                        # Убедимся, что нет новых строк в JSON
+                        json_data = json_data.replace('\n', ' ').replace('\r', ' ')
+                        yield f"data: {json_data}\n\n"  # Обязательно двойной \n\n
+
+                    except Exception as e:
+                        print(f"SSE: Ошибка: {e}")
+                        yield 'data: {"presses":[]}\n\n'
+                        time.sleep(1)
+
+                    time.sleep(5.0)
 
             return Response(generate(), mimetype="text/event-stream")
 
@@ -293,16 +368,19 @@ class WebInterface(threading.Thread):
                 return jsonify({
                     "presses": [
                         {
-                            "zones": [{"Kp": 2.5, "Ki": 0.15, "Kd": 0.8, "offset": 0.0}] * 8,
-                            "pressure_pid": {"Kp": 1.2, "Ki": 0.05, "Kd": 0.4}
+                            "pwm_period": 10.0,
+                            "zones": [{"Kp": 2.5, "Ki": 0.15, "Kd": 0.8, "offset": 0.0, "mul": 1.0}] * 7,
+                            "pressure_pid": {"Kp": 2.2, "Ki": 0.05, "Kd": 0.4, "offset": 0.0}
                         },
                         {
-                            "zones": [{"Kp": 2.5, "Ki": 0.15, "Kd": 0.8, "offset": 0.0}] * 8,
-                            "pressure_pid": {"Kp": 1.2, "Ki": 0.05, "Kd": 0.4}
+                            "pwm_period": 10.0,
+                            "zones": [{"Kp": 2.5, "Ki": 0.15, "Kd": 0.8, "offset": 0.0, "mul": 1.0}] * 7,
+                            "pressure_pid": {"Kp": 1.2, "Ki": 0.05, "Kd": 0.4, "offset": 0.0}
                         },
                         {
-                            "zones": [{"Kp": 2.5, "Ki": 0.15, "Kd": 0.8, "offset": 0.0}] * 8,
-                            "pressure_pid": {"Kp": 1.2, "Ki": 0.05, "Kd": 0.4}
+                            "pwm_period": 10.0,
+                            "zones": [{"Kp": 2.5, "Ki": 0.15, "Kd": 0.8, "offset": 0.0, "mul": 1.0}] * 7,
+                            "pressure_pid": {"Kp": 1.2, "Ki": 0.05, "Kd": 0.4, "offset": 0.0}
                         }
                     ]
                 })
@@ -315,17 +393,19 @@ class WebInterface(threading.Thread):
 
             for pid in [1, 2, 3]:
                 zones = []
-                for i in range(8):
+                for i in range(7):
                     kp = data.get(f"p{pid}_kp_{i}")
 
                     zones.append({
                         "Kp": float(data.get(f"p{pid}_kp_{i}", 2.5)),
                         "Ki": float(data.get(f"p{pid}_ki_{i}", 0.15)),
                         "Kd": float(data.get(f"p{pid}_kd_{i}", 0.8)),
-                        "offset": float(data.get(f"p{pid}_offset_{i}", 0.0))
+                        "offset": float(data.get(f"p{pid}_offset_{i}", 0.0)),
+                        "mul": float(data.get(f"p{pid}_mul_{i}", 1.0))
                     })
                 config["presses"].append({
                     "id": pid,
+                    "pwm_period": float(data.get(f"p{pid}_pwm_period", 1.2)),
                     "zones": zones,
                     "pressure_pid": {
                         "Kp": float(data.get(f"p{pid}_press_kp", 1.2)),
@@ -333,13 +413,35 @@ class WebInterface(threading.Thread):
                         "Kd": float(data.get(f"p{pid}_press_kd", 0.4))
                     }
                 })
-            #with open("config/pid_config.json", "w", encoding="utf-8") as f:
-                #json.dump(config, f, indent=4, ensure_ascii=False)
+            # print(data)
+            # with open("config/pid_config.json", "w", encoding="utf-8") as f:
+            # json.dump(config, f, indent=4, ensure_ascii=False)
 
             # 🔥 Просто сохраняем пришедший JSON
             with open("config/pid_config.json", "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
             return "OK"
+
+        @self.app.route("/logs")
+        def logs():
+            return render_template("logs.html")
+
+        @self.app.route("/get_app_log")
+        def get_app_log():
+            try:
+                with open("logs/app.log", "r", encoding="utf-8") as f:
+                    return f.read()
+            except Exception as e:
+                return f"Ошибка чтения лога: {e}"
+
+        @self.app.route("/get_state")
+        def get_state():
+            return jsonify(state.get_all())
+
+        @self.app.route("/state")
+        def state_page():
+            return render_template('state.html')
+
     def _get_timestamp(self):
         return datetime.now().strftime("%H:%M:%S")
 

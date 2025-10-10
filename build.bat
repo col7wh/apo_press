@@ -5,7 +5,7 @@ pip install pyinstaller colorama pyserial
 if exist dist rmdir /s /q dist
 if exist build rmdir /s /q build
 
-pyinstaller --onefile --console diagnose.py
+
 pyinstaller --onefile --console main.py
 
 echo.
